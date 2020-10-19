@@ -385,7 +385,7 @@ except IOError:
 		if(psutil.pid_exists(oldpid)):
 			# another instance is still running -> exit
 			print("OCO Agent already running at pid "+str(oldpid)+". Exiting.")
-			exit()
+			sys.exit()
 		else:
 			# process is not running anymore -> delete lockfile and start agent
 			print("Cleaning up orphaned lockfile (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
@@ -407,7 +407,7 @@ try:
 	apikey = configParser.get("server", "client-key")
 except Exception as e:
 	print(str(e))
-	exit(1)
+	sys.exit(1)
 
 # send initial request
 data = {
