@@ -21,6 +21,12 @@ The OCO agent needs to be installed on every client which should be managed with
 3. Manually execute the script as root/Administrator in terminal to check its functionality.
 4. Set up a cron job executing the script as root/Administrator every minute.
 
+## Integration in your OS installation
+You can use known techniques to integrate the agent into your "golden master" OS image, e.g.:
+
+- [Ubuntu Live CD Customization](https://help.ubuntu.com/community/LiveCDCustomization) or [Live CD remastering](https://wiki.ubuntuusers.de/LiveCD_manuell_remastern/) for Linux
+- [NTLite](https://www.ntlite.com/) or [DISM](https://docs.microsoft.com/de-de/windows-hardware/manufacture/desktop/what-is-dism) for Windows
+
 ## Development
 ### Build Process
 ```
