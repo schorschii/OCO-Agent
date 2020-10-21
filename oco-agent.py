@@ -354,13 +354,14 @@ def jsonRequest(method, data):
 		}
 	}
 	data_json = json.dumps(data)
+	print("< " + data_json)
 
 	# send request
 	response = requests.post(apiurl, data=data_json, headers=headers)
 
 	# print response
 	print(response)
-	print(response.text)
+	print("> " + response.text)
 
 	# return response
 	return response
@@ -472,12 +473,13 @@ if(request.status_code == 200):
 
 				if(job['procedure'] != ""):
 					os.chdir(tempPath)
-					res = subprocess.run(job['procedure'], shell=True, capture_output=True)
+					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
 					if res.returncode == 0:
 						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'message': res.stdout})
 					else:
-						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': res.stderr})
+						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': res.stdout})
 
+				os.chdir(tempfile.gettempdir())
 				removeAll(tempPath)
 
 			except Exception as e:
