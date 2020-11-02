@@ -23,6 +23,7 @@ import argparse
 import psutil
 from psutil import virtual_memory
 import distro
+import time
 import datetime
 from dateutil import tz
 import tempfile
@@ -366,6 +367,85 @@ def jsonRequest(method, data):
 	# return response
 	return response
 
+# the main server communication function
+# sends a "client_hello" packet to the server and then executes various tasks, depending on the server's response
+def mainloop():
+	# send initial request
+	data = {
+		"agent_version": AGENT_VERSION,
+		"hostname": socket.gethostname(),
+		"networks": getNics(),
+	}
+	request = jsonRequest("oco.client_hello", data)
+
+	# check response
+	if(request.status_code == 200):
+		responseJson = request.json()
+
+		# send computer info if requested
+		if(responseJson["result"]["params"]["update"] == 1):
+			data = {
+				'agent_version': AGENT_VERSION,
+				'hostname': socket.gethostname(),
+				'os': getOs(),
+				'os_version': getOsVersion(),
+				'os_license': getIsActivated(),
+				'os_language': getLocale(),
+				'kernel_version': getKernelVersion(),
+				'architecture': platform.machine(),
+				'cpu': getCpu(),
+				'ram': virtual_memory().total,
+				'gpu': getGpu(),
+				'serial': getMachineSerial(),
+				'manufacturer': getMachineManufacturer(),
+				'model': getMachineModel(),
+				'bios_version': getBiosVersion(),
+				'boot_type': getUefiOrBios(),
+				'secure_boot': getSecureBootEnabled(),
+				'networks': getNics(),
+				'drives': getDrives(),
+				'screens': getScreens(),
+				'printer': getPrinter(),
+				'software': getInstalledSoftware(),
+				'logins': getLogins()
+			}
+			request = jsonRequest('oco.client_update', data)
+
+		# execute jobs if requested
+		if(len(responseJson['result']['params']['software-jobs']) > 0):
+			for job in responseJson['result']['params']['software-jobs']:
+				try:
+
+					print('Begin Software Job '+str(job['id']))
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'message': ''})
+
+					tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
+					tempPath = tempfile.gettempdir()+'/oco-staging'
+
+					payloadparams = { 'client-key' : apikey, 'id' : job['package_id'] }
+					urllib.request.urlretrieve(payloadurl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
+
+					if(os.path.exists(tempPath)): removeAll(tempPath)
+					os.mkdir(tempPath)
+
+					with ZipFile(tempZipPath, 'r') as zipObj:
+						zipObj.extractall(tempPath)
+
+					if(job['procedure'] != ""):
+						os.chdir(tempPath)
+						res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+						if res.returncode == 0:
+							jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'message': res.stdout})
+						else:
+							jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': res.stdout})
+
+					os.chdir(tempfile.gettempdir())
+					removeAll(tempPath)
+
+				except Exception as e:
+					print(str(e))
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': str(e)})
+
 ##### MAIN #####
 
 # check if already running (e.g. due to long running software jobs)
@@ -400,6 +480,7 @@ except IOError:
 try:
 	parser = argparse.ArgumentParser(add_help=False)
 	parser.add_argument("--config", default="./oco-agent.ini", type=str)
+	parser.add_argument("--daemon", action="store_true")
 	args = parser.parse_args()
 	configParser = configparser.RawConfigParser()
 	configParser.read(args.config)
@@ -410,82 +491,17 @@ except Exception as e:
 	print(str(e))
 	sys.exit(1)
 
-# send initial request
-data = {
-	"agent_version": AGENT_VERSION,
-	"hostname": socket.gethostname(),
-	"networks": getNics(),
-}
-request = jsonRequest("oco.client_hello", data)
+# execute the agent as daemon
+if(args.daemon):
+	while(True):
+		mainloop()
+		print("Running in daemon mode. Waiting to send next request.")
+		time.sleep(60)
+# execute the agent once
+else:
+	mainloop()
 
-# check response
-if(request.status_code == 200):
-	responseJson = request.json()
-
-	# send computer info if requested
-	if(responseJson["result"]["params"]["update"] == 1):
-		data = {
-			'agent_version': AGENT_VERSION,
-			'hostname': socket.gethostname(),
-			'os': getOs(),
-			'os_version': getOsVersion(),
-			'os_license': getIsActivated(),
-			'os_language': getLocale(),
-			'kernel_version': getKernelVersion(),
-			'architecture': platform.machine(),
-			'cpu': getCpu(),
-			'ram': virtual_memory().total,
-			'gpu': getGpu(),
-			'serial': getMachineSerial(),
-			'manufacturer': getMachineManufacturer(),
-			'model': getMachineModel(),
-			'bios_version': getBiosVersion(),
-			'boot_type': getUefiOrBios(),
-			'secure_boot': getSecureBootEnabled(),
-			'networks': getNics(),
-			'drives': getDrives(),
-			'screens': getScreens(),
-			'printer': getPrinter(),
-			'software': getInstalledSoftware(),
-			'logins': getLogins()
-		}
-		request = jsonRequest('oco.client_update', data)
-
-	# execute jobs if requested
-	if(len(responseJson['result']['params']['software-jobs']) > 0):
-		for job in responseJson['result']['params']['software-jobs']:
-			try:
-
-				print('Begin Software Job '+str(job['id']))
-				jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'message': ''})
-
-				tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
-				tempPath = tempfile.gettempdir()+'/oco-staging'
-
-				payloadparams = { 'client-key' : apikey, 'id' : job['package_id'] }
-				urllib.request.urlretrieve(payloadurl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
-
-				if(os.path.exists(tempPath)): removeAll(tempPath)
-				os.mkdir(tempPath)
-
-				with ZipFile(tempZipPath, 'r') as zipObj:
-					zipObj.extractall(tempPath)
-
-				if(job['procedure'] != ""):
-					os.chdir(tempPath)
-					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-					if res.returncode == 0:
-						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'message': res.stdout})
-					else:
-						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': res.stdout})
-
-				os.chdir(tempfile.gettempdir())
-				removeAll(tempPath)
-
-			except Exception as e:
-				print(str(e))
-				jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': str(e)})
-
+# clean up lockfile
 lockfile.close()
 os.unlink(LOCKFILE_PATH)
 print("Closing lockfile and exiting.")
