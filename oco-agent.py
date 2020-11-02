@@ -355,17 +355,19 @@ def jsonRequest(method, data):
 		}
 	}
 	data_json = json.dumps(data)
-	print("< " + data_json)
+	print(logtime()+"< " + data_json)
 
 	# send request
 	response = requests.post(apiurl, data=data_json, headers=headers)
 
 	# print response
-	print(response)
-	print("> " + response.text)
+	print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
 
 	# return response
 	return response
+
+def logtime():
+	return "["+str(datetime.datetime.now())+"] "
 
 # the main server communication function
 # sends a "client_hello" packet to the server and then executes various tasks, depending on the server's response
@@ -455,7 +457,7 @@ try:
 	with open(LOCKFILE_PATH, 'x') as lockfile:
 		pid = str(os.getpid())
 		lockfile.write(pid)
-		print("OCO Agent starting (pid "+pid+")...")
+		print(logtime()+"OCO Agent starting (pid "+pid+")...")
 except IOError:
 	# there is a lock file - check if pid from lockfile is still active
 	with open(LOCKFILE_PATH, 'r') as lockfile:
@@ -465,16 +467,16 @@ except IOError:
 		lockfile.close()
 		if(psutil.pid_exists(oldpid)):
 			# another instance is still running -> exit
-			print("OCO Agent already running at pid "+str(oldpid)+". Exiting.")
+			print(logtime()+"OCO Agent already running at pid "+str(oldpid)+". Exiting.")
 			sys.exit()
 		else:
 			# process is not running anymore -> delete lockfile and start agent
-			print("Cleaning up orphaned lockfile (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
+			print(logtime()+"Cleaning up orphaned lockfile (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
 			os.unlink(LOCKFILE_PATH)
 			with open(LOCKFILE_PATH, 'x') as lockfile:
 				pid = str(os.getpid())
 				lockfile.write(pid)
-				print("OCO Agent starting (pid "+pid+")...")
+				print(logtime()+"OCO Agent starting (pid "+pid+")...")
 
 # read config
 try:
@@ -495,7 +497,7 @@ except Exception as e:
 if(args.daemon):
 	while(True):
 		mainloop()
-		print("Running in daemon mode. Waiting to send next request.")
+		print(logtime()+"Running in daemon mode. Waiting to send next request.")
 		time.sleep(60)
 # execute the agent once
 else:
@@ -504,4 +506,4 @@ else:
 # clean up lockfile
 lockfile.close()
 os.unlink(LOCKFILE_PATH)
-print("Closing lockfile and exiting.")
+print(logtime()+"Closing lockfile and exiting.")
