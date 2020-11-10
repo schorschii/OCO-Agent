@@ -482,10 +482,11 @@ except IOError:
 try:
 	parser = argparse.ArgumentParser(add_help=False)
 	parser.add_argument("--config", default="./oco-agent.ini", type=str)
-	parser.add_argument("--daemon", action="store_true")
 	args = parser.parse_args()
 	configParser = configparser.RawConfigParser()
 	configParser.read(args.config)
+	queryinterval = int(configParser.get("agent", "query-interval"))
+	daemonmode = int(configParser.get("agent", "daemon-mode"))
 	apiurl = configParser.get("server", "api-url")
 	payloadurl = configParser.get("server", "payload-url")
 	apikey = configParser.get("server", "client-key")
@@ -494,11 +495,11 @@ except Exception as e:
 	sys.exit(1)
 
 # execute the agent as daemon
-if(args.daemon):
+if(daemonmode == 1):
 	while(True):
 		mainloop()
-		print(logtime()+"Running in daemon mode. Waiting to send next request.")
-		time.sleep(60)
+		print(logtime()+"Running in daemon mode. Waiting "+str(queryinterval)+" seconds to send next request.")
+		time.sleep(queryinterval)
 # execute the agent once
 else:
 	mainloop()
