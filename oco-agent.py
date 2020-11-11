@@ -359,18 +359,23 @@ def jsonRequest(method, data):
 		}
 	}
 	data_json = json.dumps(data)
-	if(DEBUG): print(logtime()+"< " + data_json)
 
-	# send request
-	response = requests.post(apiUrl, data=data_json, headers=headers)
+	try:
+		# send request
+		if(DEBUG): print(logtime()+"< " + data_json)
+		response = requests.post(apiUrl, data=data_json, headers=headers)
 
-	# print response
-	if(DEBUG): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
-	if(response.status_code != 200):
-		print(logtime()+"Request failed with HTTP status code " + str(response.status_code))
+		# print response
+		if(DEBUG): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
+		if(response.status_code != 200):
+			print(logtime()+"Request failed with HTTP status code " + str(response.status_code))
 
-	# return response
-	return response
+		# return response
+		return response
+
+	except Exception as e:
+		print(logtime()+str(e))
+		return None
 
 def logtime():
 	return "["+str(datetime.datetime.now())+"] "
@@ -387,7 +392,7 @@ def mainloop():
 	request = jsonRequest("oco.agent_hello", data)
 
 	# check response
-	if(request.status_code == 200):
+	if(request != None and request.status_code == 200):
 		responseJson = request.json()
 
 		# update agent key if requested
