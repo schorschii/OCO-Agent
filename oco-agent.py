@@ -46,7 +46,10 @@ def getNics():
 		if(netifaces.AF_INET in netifaces.ifaddresses(interface)):
 			ineta = netifaces.ifaddresses(interface)[netifaces.AF_INET][0]
 			if(ineta["addr"] == "127.0.0.1"): continue
-			ineta["mac"] = netifaces.ifaddresses(interface)[netifaces.AF_LINK][0]["addr"]
+			if(netifaces.AF_LINK in netifaces.ifaddresses(interface)):
+				ineta["mac"] = netifaces.ifaddresses(interface)[netifaces.AF_LINK][0]["addr"]
+			else:
+				ineta["mac"] = "?"
 			ineta["domain"] = socket.getfqdn()
 			nics.append(ineta)
 	return nics
@@ -350,18 +353,21 @@ def jsonRequest(method, data):
 		"id": 1,
 		"method": method,
 		"params": {
-			"client-key": apikey,
+			"hostname": socket.gethostname(),
+			"agent-key": apiKey,
 			"data": data
 		}
 	}
 	data_json = json.dumps(data)
-	print(logtime()+"< " + data_json)
+	if(DEBUG): print(logtime()+"< " + data_json)
 
 	# send request
-	response = requests.post(apiurl, data=data_json, headers=headers)
+	response = requests.post(apiUrl, data=data_json, headers=headers)
 
 	# print response
-	print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
+	if(DEBUG): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
+	if(response.status_code != 200):
+		print(logtime()+"Request failed with HTTP status code " + str(response.status_code))
 
 	# return response
 	return response
@@ -370,25 +376,34 @@ def logtime():
 	return "["+str(datetime.datetime.now())+"] "
 
 # the main server communication function
-# sends a "client_hello" packet to the server and then executes various tasks, depending on the server's response
+# sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
 def mainloop():
 	# send initial request
+	print(logtime()+"Sending agent_hello...")
 	data = {
 		"agent_version": AGENT_VERSION,
-		"hostname": socket.gethostname(),
 		"networks": getNics(),
 	}
-	request = jsonRequest("oco.client_hello", data)
+	request = jsonRequest("oco.agent_hello", data)
 
 	# check response
 	if(request.status_code == 200):
 		responseJson = request.json()
 
+		# update agent key if requested
+		if(responseJson["result"]["params"]["agent-key"] != None):
+			print(logtime()+"Write new config with updated agent key...")
+			configParser.set("agent", "agent-key", responseJson["result"]["params"]["agent-key"])
+			with open(args.config, 'w') as fileHandle:
+				configParser.write(fileHandle)
+			global apiKey
+			apiKey = configParser.get("agent", "agent-key")
+
 		# send computer info if requested
 		if(responseJson["result"]["params"]["update"] == 1):
+			print(logtime()+"Updating inventory data...")
 			data = {
 				'agent_version': AGENT_VERSION,
-				'hostname': socket.gethostname(),
 				'os': getOs(),
 				'os_version': getOsVersion(),
 				'os_license': getIsActivated(),
@@ -411,21 +426,21 @@ def mainloop():
 				'software': getInstalledSoftware(),
 				'logins': getLogins()
 			}
-			request = jsonRequest('oco.client_update', data)
+			request = jsonRequest('oco.agent_update', data)
 
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
 			for job in responseJson['result']['params']['software-jobs']:
 				try:
 
-					print('Begin Software Job '+str(job['id']))
+					print(logtime()+'Begin Software Job '+str(job['id']))
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'message': ''})
 
 					tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
 					tempPath = tempfile.gettempdir()+'/oco-staging'
 
-					payloadparams = { 'client-key' : apikey, 'id' : job['package_id'] }
-					urllib.request.urlretrieve(payloadurl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
+					payloadparams = { 'hostname' : socket.gethostname(), 'agent-key' : apiKey, 'id' : job['package_id'] }
+					urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
 
 					if(os.path.exists(tempPath)): removeAll(tempPath)
 					os.mkdir(tempPath)
@@ -445,7 +460,7 @@ def mainloop():
 					removeAll(tempPath)
 
 				except Exception as e:
-					print(str(e))
+					print(logtime()+str(e))
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': str(e)})
 
 ##### MAIN #####
@@ -485,21 +500,22 @@ try:
 	args = parser.parse_args()
 	configParser = configparser.RawConfigParser()
 	configParser.read(args.config)
-	queryinterval = int(configParser.get("agent", "query-interval"))
-	daemonmode = int(configParser.get("agent", "daemon-mode"))
-	apiurl = configParser.get("server", "api-url")
-	payloadurl = configParser.get("server", "payload-url")
-	apikey = configParser.get("server", "client-key")
+	DEBUG = (int(configParser.get("agent", "debug")) == 1)
+	queryInterval = int(configParser.get("agent", "query-interval"))
+	daemonMode = int(configParser.get("agent", "daemon-mode"))
+	apiKey = configParser.get("agent", "agent-key")
+	apiUrl = configParser.get("server", "api-url")
+	payloadUrl = configParser.get("server", "payload-url")
 except Exception as e:
-	print(str(e))
+	print(logtime()+str(e))
 	sys.exit(1)
 
 # execute the agent as daemon
-if(daemonmode == 1):
+if(daemonMode == 1):
 	while(True):
 		mainloop()
-		print(logtime()+"Running in daemon mode. Waiting "+str(queryinterval)+" seconds to send next request.")
-		time.sleep(queryinterval)
+		print(logtime()+"Running in daemon mode. Waiting "+str(queryInterval)+" seconds to send next request.")
+		time.sleep(queryInterval)
 # execute the agent once
 else:
 	mainloop()
