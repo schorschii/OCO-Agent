@@ -12,14 +12,18 @@ The OCO agent needs to be installed on every client which should be managed with
 
 ## Package Installation
 1. Please visit the Github release page of this repo, download and install the appropriate installation package for your operating system.
-2. Adjust the config file (.ini) in the installation directory to point to your OCO server and set the correct client key (defined on the server's web frontend).
+2. Adjust the config file (.ini) in the installation directory (respectively `/etc`) to point to your OCO server and set the correct client key (defined on the server's web frontend).
 
 ## Manual Installation
 0. Make sure Python 3 and all required modules are installed.
+   - `apt install python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro`
+   - `sudo -H pip3 install python3-dateutil wtmp`
+   - only for Windows: `pip install wmi`
+   - only for macOS: `pip install plistlib`
 1. Copy the agent script and config file into an appropriate program dir (e.g. `/opt/oco-agent`).
 2. Adjust the config file (.ini) in the installation directory to point to your OCO server and set the correct client key (defined on the server's web frontend). Set appropriate permissions to only allow root/Administrator to read the file content in order to protect the client key.
 3. Manually execute the script as root/Administrator in terminal to check its functionality.
-4. Set up a cron job executing the script as root/Administrator every minute.
+4. Set up your system to run the agent script as service. Concrete steps depending on your init system. A `.service` file for systemd is included in this repo (move it to `/etc/systemd/system` and run `systemctl enable oco-agent && systemctl start oco-agent`).
 
 ## Integration in your OS installation
 You can use known techniques to integrate the agent into your "golden master" OS image, e.g.:

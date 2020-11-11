@@ -1,0 +1,12 @@
+[Unit]
+Description=OCO Agent
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/python3 /usr/bin/oco-agent.py --config /etc/oco-agent.ini
+
+[Install]
+WantedBy=multi-user.target
