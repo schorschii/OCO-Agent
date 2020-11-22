@@ -21,6 +21,7 @@ import urllib
 import configparser
 import argparse
 import psutil
+import atexit
 from psutil import virtual_memory
 import distro
 import time
@@ -32,10 +33,10 @@ from zipfile import ZipFile
 
 
 AGENT_VERSION = "0.1"
+DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
+LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
-if "win32" in OS_TYPE:
-	import wmi
-	import winreg
+if "win32" in OS_TYPE: import wmi, winreg
 
 
 ##### FUNCTIONS #####
@@ -380,6 +381,47 @@ def jsonRequest(method, data):
 def logtime():
 	return "["+str(datetime.datetime.now())+"] "
 
+# function for checking if agent is already running (e.g. due to long running software jobs)
+def lockCheck():
+	try:
+		# if we can open the lockfile without error, no other instance is running
+		with open(LOCKFILE_PATH, 'x') as lockfile:
+			pid = str(os.getpid())
+			lockfile.write(pid)
+			print(logtime()+"OCO Agent starting with Lockfile (pid "+pid+")...")
+	except IOError:
+		# there is a lock file - check if pid from lockfile is still active
+		with open(LOCKFILE_PATH, 'r') as lockfile:
+			oldpid = -1
+			try: oldpid = int(lockfile.read().strip())
+			except ValueError: pass
+			lockfile.close()
+			if(psutil.pid_exists(oldpid)):
+				# another instance is still running -> exit
+				print(logtime()+"OCO Agent already running at pid "+str(oldpid)+" (Lockfile "+LOCKFILE_PATH+"). Exiting.")
+				sys.exit()
+			else:
+				# process is not running anymore -> delete lockfile and start agent
+				print(logtime()+"Cleaning up orphaned lockfile (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
+				os.unlink(LOCKFILE_PATH)
+				with open(LOCKFILE_PATH, 'x') as lockfile:
+					pid = str(os.getpid())
+					lockfile.write(pid)
+					print(logtime()+"OCO Agent starting with Lockfile (pid "+pid+")...")
+	atexit.register(lockClean, lockfile)
+# clean up lockfile
+def lockClean(lockfile):
+	lockfile.close()
+	os.unlink(LOCKFILE_PATH)
+	print(logtime()+"Closing lockfile and exiting.")
+
+# the daemon function - calls mainloop() in endless loop
+def daemon():
+	while(True):
+		mainloop()
+		print(logtime()+"Running in daemon mode. Waiting "+str(queryInterval)+" seconds to send next request.")
+		time.sleep(queryInterval)
+
 # the main server communication function
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
 def mainloop():
@@ -470,41 +512,17 @@ def mainloop():
 
 ##### MAIN #####
 
-# check if already running (e.g. due to long running software jobs)
-LOCKFILE_PATH = tempfile.gettempdir()+'/oco.agent.lock'
 try:
-	# if we can open the lockfile without error, no other instance is running
-	with open(LOCKFILE_PATH, 'x') as lockfile:
-		pid = str(os.getpid())
-		lockfile.write(pid)
-		print(logtime()+"OCO Agent starting (pid "+pid+")...")
-except IOError:
-	# there is a lock file - check if pid from lockfile is still active
-	with open(LOCKFILE_PATH, 'r') as lockfile:
-		oldpid = -1
-		try: oldpid = int(lockfile.read().strip())
-		except ValueError: pass
-		lockfile.close()
-		if(psutil.pid_exists(oldpid)):
-			# another instance is still running -> exit
-			print(logtime()+"OCO Agent already running at pid "+str(oldpid)+". Exiting.")
-			sys.exit()
-		else:
-			# process is not running anymore -> delete lockfile and start agent
-			print(logtime()+"Cleaning up orphaned lockfile (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
-			os.unlink(LOCKFILE_PATH)
-			with open(LOCKFILE_PATH, 'x') as lockfile:
-				pid = str(os.getpid())
-				lockfile.write(pid)
-				print(logtime()+"OCO Agent starting (pid "+pid+")...")
-
-# read config
-try:
+	# read arguments
 	parser = argparse.ArgumentParser(add_help=False)
-	parser.add_argument("--config", default="./oco-agent.ini", type=str)
+	parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, type=str)
 	args = parser.parse_args()
+	configFilePath = args.config
+	print(logtime()+"OCO Agent starting with config file: "+configFilePath+" ...")
+
+	# read config
 	configParser = configparser.RawConfigParser()
-	configParser.read(args.config)
+	configParser.read(configFilePath)
 	DEBUG = (int(configParser.get("agent", "debug")) == 1)
 	queryInterval = int(configParser.get("agent", "query-interval"))
 	daemonMode = int(configParser.get("agent", "daemon-mode"))
@@ -515,17 +533,12 @@ except Exception as e:
 	print(logtime()+str(e))
 	sys.exit(1)
 
-# execute the agent as daemon
+# execute the agent as daemon if requested
 if(daemonMode == 1):
-	while(True):
-		mainloop()
-		print(logtime()+"Running in daemon mode. Waiting "+str(queryInterval)+" seconds to send next request.")
-		time.sleep(queryInterval)
+	lockCheck()
+	daemon()
+
 # execute the agent once
 else:
+	lockCheck()
 	mainloop()
-
-# clean up lockfile
-lockfile.close()
-os.unlink(LOCKFILE_PATH)
-print(logtime()+"Closing lockfile and exiting.")
