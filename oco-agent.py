@@ -32,7 +32,7 @@ import subprocess
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.1"
+AGENT_VERSION = "0.2"
 DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
@@ -264,27 +264,45 @@ def getScreens():
 				})
 	return screens
 
-def getPrinter():
-	printer = []
+def getPrinters():
+	printers = []
 	if "win32" in OS_TYPE:
 		w = wmi.WMI()
 		for o in w.Win32_Printer():
-			printer.append({
+			printers.append({
 				"name": o.Name,
 				"driver": o.DriverName,
+				"paper": "",
 				"dpi": o.HorizontalResolution,
-				"local": o.Local,
-				"state": o.PrinterState,
-				"status": o.PrinterStatus
+				"uri": o.Local,
+				"status": o.PrinterState + " " + o.PrinterStatus
 			})
-	return printer
+	elif "linux" in OS_TYPE or "darwin" in OS_TYPE:
+		CUPS_CONFIG = "/etc/cups/printers.conf"
+		if(os.path.exists(CUPS_CONFIG)):
+			with open(CUPS_CONFIG) as file:
+				printer = {"name": "", "driver": "", "paper": "", "dpi": "", "uri": "", "status": ""}
+				for line in file:
+					l = line.rstrip("\n")
+					if(l.startswith("<DefaultPrinter ") or l.startswith("<Printer ")):
+						printer = {
+							"name": l.split(" ", 1)[1].rstrip(">"),
+							"driver": "", "paper": "", "dpi": "", "uri": "", "status": ""
+						}
+					if(l.startswith("MakeModel ")):
+						printer["driver"] = l.split(" ", 1)[1]
+					if(l.startswith("DeviceURI ")):
+						printer["uri"] = l.split(" ", 1)[1]
+					if(l.startswith("</DefaultPrinter>") or l.startswith("</Printer>")):
+						if(printer["name"] != ""): printers.append(printer)
+	return printers
 
-def getDrives():
-	drives = []
+def getPartitions():
+	partitions = []
 	if "win32" in OS_TYPE:
 		w = wmi.WMI()
 		for o in w.Win32_LogicalDisk():
-			drives.append({
+			partitions.append({
 				"device": "",
 				"mountpoint": o.DeviceID,
 				"filesystem": o.FileSystem,
@@ -293,7 +311,43 @@ def getDrives():
 				"free": o.FreeSpace,
 				"serial": o.VolumeSerialNumber
 			})
-	return drives
+	elif "linux" in OS_TYPE:
+		command = "df -k --output=used,avail,fstype,source,target"
+		lines = os.popen(command).read().strip().splitlines()
+		first = True
+		for line in lines:
+			if(first): first = False; continue
+			values = " ".join(line.split()).split()
+			if(len(values) != 5): continue
+			if(values[2] == "tmpfs" or values[2] == "devtmpfs"): continue
+			partitions.append({
+				"device": values[3],
+				"mountpoint": values[4],
+				"filesystem": values[2],
+				"size": (int(values[0])+int(values[1]))*1024,
+				"free": int(values[1])*1024,
+				"name": "",
+				"serial": ""
+			})
+	elif "darwin" in OS_TYPE:
+		command = "df -k"
+		lines = os.popen(command).read().strip().splitlines()
+		first = True
+		for line in lines:
+			if(first): first = False; continue
+			values = " ".join(line.split()).split()
+			if(len(values) != 9): continue
+			if(values[0] == "devfs"): continue
+			partitions.append({
+				"device": values[0],
+				"mountpoint": values[8],
+				"filesystem": "",
+				"size": (int(values[2])+int(values[3]))*1024,
+				"free": int(values[3])*1024,
+				"name": "",
+				"serial": ""
+			})
+	return partitions
 
 def getLogins():
 	users = []
@@ -467,9 +521,9 @@ def mainloop():
 				'boot_type': getUefiOrBios(),
 				'secure_boot': getSecureBootEnabled(),
 				'networks': getNics(),
-				'drives': getDrives(),
 				'screens': getScreens(),
-				'printer': getPrinter(),
+				'printers': getPrinters(),
+				'partitions': getPartitions(),
 				'software': getInstalledSoftware(),
 				'logins': getLogins()
 			}
