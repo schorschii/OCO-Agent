@@ -272,10 +272,10 @@ def getPrinters():
 			printers.append({
 				"name": o.Name,
 				"driver": o.DriverName,
-				"paper": "",
+				"paper": ", ".join(o.PrinterPaperNames),
 				"dpi": o.HorizontalResolution,
-				"uri": o.Local,
-				"status": o.PrinterState + " " + o.PrinterStatus
+				"uri": o.PortName,
+				"status": str(o.PrinterState) + " " + str(o.PrinterStatus)
 			})
 	elif "linux" in OS_TYPE or "darwin" in OS_TYPE:
 		CUPS_CONFIG = "/etc/cups/printers.conf"
