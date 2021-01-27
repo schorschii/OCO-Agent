@@ -15,10 +15,10 @@ The OCO agent needs to be installed on every client which should be managed with
 
 ## Manual Installation
 0. Make sure Python 3 and all required modules are installed (use `sudo -H` for system-wide module installation).
-   - Linux: `apt install python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip` and `(sudo -H) pip3 install python-dateutil`
+   - Linux: `apt install python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip python3-dateutil`
    - Windows: `pip install pip install requests netifaces urllib3 psutil distro python-dateutil`
    - only for Linux: `(sudo -H) pip3 install utmp`
-   - only for Windows: `pip install wmi`
+   - only for Windows: `pip install wmi winapps`
    - only for macOS: `pip install plistlib`
 1. Copy the agent script and config file into an appropriate program dir (e.g. `/opt/oco-agent`).
 2. Adjust the config file (.ini) in the installation directory to point to your OCO server and set the correct client key (defined on the server's web frontend). Set appropriate permissions to only allow root/Administrator to read the file content in order to protect the client key.

@@ -36,7 +36,7 @@ AGENT_VERSION = "0.2"
 DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
-if "win32" in OS_TYPE: import wmi, winreg
+if "win32" in OS_TYPE: import wmi, winreg, winapps
 
 
 ##### FUNCTIONS #####
@@ -145,14 +145,11 @@ def getSecureBootEnabled():
 def getInstalledSoftware():
 	software = []
 	if "win32" in OS_TYPE:
-		w = wmi.WMI()
-		for p in w.Win32_InstalledWin32Program():
-			app_name = str(p.Name).encode("utf8","ignore").decode()
-			vendor = str(p.Vendor).encode("utf8","ignore").decode()
+		for p in winapps.list_installed():
 			software.append({
-				"name": app_name,
-				"version": p.Version,
-				"description": vendor
+				"name": p.name,
+				"version": "" if p.version == None else p.version,
+				"description": "" if p.publisher == None else p.publisher
 			})
 	elif "linux" in OS_TYPE:
 		command = "apt list --installed"
