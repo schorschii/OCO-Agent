@@ -261,6 +261,20 @@ def getScreens():
 				})
 	return screens
 
+def winPrinterStatus(status, state):
+	if(state == 2): return "Error";
+	if(state == 8): return "Paper Jam";
+	if(state == 16): return "Out Of Paper";
+	if(state == 64): return "Paper Problem";
+	if(state == 131072): return "Toner Low";
+	if(state == 262144): return "No Toner";
+	if(status == 1): return "Other";
+	if(status == 3): return "Idle";
+	if(status == 4): return "Printing";
+	if(status == 5): return "Warmup";
+	if(status == 6): return "Stopped";
+	if(status == 7): return "Offline";
+	return "Unknown";
 def getPrinters():
 	printers = []
 	if "win32" in OS_TYPE:
@@ -272,7 +286,7 @@ def getPrinters():
 				"paper": ", ".join(o.PrinterPaperNames),
 				"dpi": o.HorizontalResolution,
 				"uri": o.PortName,
-				"status": str(o.PrinterState) + " " + str(o.PrinterStatus)
+				"status": winPrinterStatus(o.PrinterStatus, o.PrinterState)
 			})
 	elif "linux" in OS_TYPE or "darwin" in OS_TYPE:
 		CUPS_CONFIG = "/etc/cups/printers.conf"
@@ -298,15 +312,19 @@ def getPartitions():
 	partitions = []
 	if "win32" in OS_TYPE:
 		w = wmi.WMI()
-		for o in w.Win32_LogicalDisk():
+		for ld in w.Win32_LogicalDisk():
+			devicePath = "?"
+			for v in w.Win32_Volume():
+				if(v.DriveLetter == ld.DeviceID):
+					devicePath = v.DeviceID
 			partitions.append({
-				"device": "",
-				"mountpoint": o.DeviceID,
-				"filesystem": o.FileSystem,
-				"name": o.VolumeName,
-				"size": o.Size,
-				"free": o.FreeSpace,
-				"serial": o.VolumeSerialNumber
+				"device": devicePath,
+				"mountpoint": ld.DeviceID,
+				"filesystem": ld.FileSystem,
+				"name": ld.VolumeName,
+				"size": ld.Size,
+				"free": ld.FreeSpace,
+				"serial": ld.VolumeSerialNumber
 			})
 	elif "linux" in OS_TYPE:
 		command = "df -k --output=used,avail,fstype,source,target"
