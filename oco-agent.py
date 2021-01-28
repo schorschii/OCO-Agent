@@ -121,7 +121,9 @@ def getUefiOrBios():
 	booted = "?"
 	if "win32" in OS_TYPE:
 		command = "bcdedit"
-		booted = "UEFI" if "EFI" in os.popen(command).read().replace("\t","").replace(" ","") else "Legacy"
+		res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+		if res.returncode == 0:
+			booted = "UEFI" if "EFI" in res.stdout else "Legacy"
 	elif "linux" in OS_TYPE:
 		booted = "UEFI" if os.path.exists("/sys/firmware/efi") else "Legacy"
 	elif "darwin" in OS_TYPE:
@@ -566,7 +568,7 @@ def mainloop():
 
 					if(job['procedure'] != ""):
 						os.chdir(tempPath)
-						res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+						res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 						if res.returncode == 0:
 							jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'message': res.stdout})
 						else:
@@ -579,14 +581,17 @@ def mainloop():
 					print(logtime()+str(e))
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': str(e)})
 
+
 ##### MAIN #####
 
 try:
 	# read arguments
 	parser = argparse.ArgumentParser(add_help=False)
 	parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, type=str)
+	parser.add_argument("--daemon", action='store_true')
 	args = parser.parse_args()
 	configFilePath = args.config
+	daemonMode = args.daemon
 	print(logtime()+"OCO Agent starting with config file: "+configFilePath+" ...")
 
 	# read config
@@ -594,7 +599,6 @@ try:
 	configParser.read(configFilePath)
 	DEBUG = (int(configParser.get("agent", "debug")) == 1)
 	queryInterval = int(configParser.get("agent", "query-interval"))
-	daemonMode = int(configParser.get("agent", "daemon-mode"))
 	apiKey = configParser.get("agent", "agent-key")
 	apiUrl = configParser.get("server", "api-url")
 	payloadUrl = configParser.get("server", "payload-url")
@@ -603,7 +607,7 @@ except Exception as e:
 	sys.exit(1)
 
 # execute the agent as daemon if requested
-if(daemonMode == 1):
+if(daemonMode == True):
 	lockCheck()
 	daemon()
 
