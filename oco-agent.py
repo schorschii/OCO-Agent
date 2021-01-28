@@ -32,11 +32,11 @@ import subprocess
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.2"
+AGENT_VERSION = "0.3"
 DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
-if "win32" in OS_TYPE: import wmi, winreg, winapps
+if "win32" in OS_TYPE: import wmi, winreg
 
 
 ##### FUNCTIONS #####
@@ -144,15 +144,46 @@ def getSecureBootEnabled():
 		secureboot = "1" if "enabled" in os.popen(command).read().replace("\t","").replace(" ","") else "0"
 	return secureboot
 
+def queryRegistrySoftware(key):
+	software = []
+	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
+	ids = []
+	try:
+		count = 0
+		while True:
+			name = winreg.EnumKey(reg, count)
+			count = count + 1
+			ids.append(name)
+	except WindowsError: pass
+	winreg.CloseKey(reg)
+	for name in ids:
+		try:
+			reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key+"\\"+name, 0, winreg.KEY_READ)
+			displayName, regtype = winreg.QueryValueEx(reg, "DisplayName")
+			displayVersion = ""
+			displayPublisher = ""
+			systemComponent = 0
+			try: displayVersion, regtype = winreg.QueryValueEx(reg, "DisplayVersion")
+			except WindowsError: pass
+			try: displayPublisher, regtype = winreg.QueryValueEx(reg, "Publisher")
+			except WindowsError: pass
+			try: systemComponent, regtype = winreg.QueryValueEx(reg, "SystemComponent")
+			except WindowsError: pass
+			winreg.CloseKey(reg)
+			if(displayName.strip() == "" or systemComponent == 1): continue
+			software.append({
+				"name": displayName,
+				"version": displayVersion,
+				"description": displayPublisher
+			})
+		except WindowsError: pass
+	return software
 def getInstalledSoftware():
 	software = []
 	if "win32" in OS_TYPE:
-		for p in winapps.list_installed():
-			software.append({
-				"name": p.name,
-				"version": "" if p.version == None else p.version,
-				"description": "" if p.publisher == None else p.publisher
-			})
+		x64software = queryRegistrySoftware("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
+		x32software = queryRegistrySoftware("SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
+		software = x32software + x64software
 	elif "linux" in OS_TYPE:
 		command = "apt list --installed"
 		for l in os.popen(command).read().split("\n"):
@@ -467,7 +498,13 @@ def lockCheck():
 			try: oldpid = int(lockfile.read().strip())
 			except ValueError: pass
 			lockfile.close()
-			if(psutil.pid_exists(oldpid)):
+			alreadyRunning = False
+			try:
+				p = psutil.Process(oldpid)
+				if(not p.exe() is None):
+					if("oco" in p.exe() or "python" in p.exe()): alreadyRunning = True
+			except Exception: pass
+			if(alreadyRunning):
 				# another instance is still running -> exit
 				print(logtime()+"OCO Agent already running at pid "+str(oldpid)+" (Lockfile "+LOCKFILE_PATH+"). Exiting.")
 				sys.exit()

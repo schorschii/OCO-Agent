@@ -2,7 +2,6 @@
 import subprocess, time, os, sys, signal, win32serviceutil, win32service, win32event, servicemanager
 
 # OCO Agent: Service Wrapper for Windows
-# pyinstaller -F --hidden-import=win32timezone service-wrapper.py
 
 class OcoWinService(win32serviceutil.ServiceFramework):
 	_svc_name_ = "oco-agent"

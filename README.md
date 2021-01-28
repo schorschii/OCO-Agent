@@ -34,9 +34,20 @@ You can use known techniques to integrate the agent into your "golden master" OS
 ## Development
 ### Build Process
 ```
-# Linux/macOS
-pyinstaller -F --icon=assets/icons/app.icns oco-agent.py
+# LINUX
+# no compilation needed, just install oco-agent.service file for systemd
+# move oco-agent.service to /etc/systemd/system
+systemctl enable oco-agent
+systemctl start oco-agent
 
-# Windows
+# WINDOWS
 pyinstaller -F --icon=assets\icons\app.ico oco-agent.py
+pyinstaller -F --hidden-import=win32timezone service-wrapper.py
+# move both to: C:\Program Files\OCO Agent
+service-wrapper.exe install
+service-wrapper.exe start
+# then enable service autostart in windows control panel
+
+# MACOS
+# coming soon...
 ```
