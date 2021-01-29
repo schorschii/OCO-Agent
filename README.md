@@ -26,7 +26,7 @@ Please do not forget to adjust the config file (.ini) to point to your OCO serve
 
 In case of problems, you can debug the agent by manually executing the script in terminal as root/Administrator, so you can check its output.
 
-**Hint:** You can create your own agent package which already contains the correct agent key and server address for your environment using methods described [here](https://github.com/schorschii/oco-server/blob/master/docs/Packages.md).
+**Hint:** You can create your own agent package which already contains the correct agent key and server address for your environment using methods described [here](https://github.com/schorschii/oco-server/blob/master/docs/Packages.md). I'm also offering the service to produce such specialized packages. Please [contact me](https://georg-sieber.de/?page=impressum) if you're interested.
 
 ### Linux (Systemd)
 No compilation needed, just install all dependencies and oco-agent.service file for systemd.
