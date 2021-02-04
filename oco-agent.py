@@ -591,21 +591,21 @@ def mainloop():
 				try:
 
 					print(logtime()+'Begin Software Job '+str(job['id']))
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
-
 					tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
 					tempPath = tempfile.gettempdir()+'/oco-staging'
-
-					payloadparams = { 'hostname' : socket.gethostname(), 'agent-key' : apiKey, 'id' : job['package_id'] }
-					urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
-
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
-
 					if(os.path.exists(tempPath)): removeAll(tempPath)
 					os.mkdir(tempPath)
 
-					with ZipFile(tempZipPath, 'r') as zipObj:
-						zipObj.extractall(tempPath)
+					if(job['download'] == True):
+						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
+
+						payloadparams = { 'hostname' : socket.gethostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
+						urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
+
+						with ZipFile(tempZipPath, 'r') as zipObj:
+							zipObj.extractall(tempPath)
+
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
 
 					os.chdir(tempPath)
 					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
