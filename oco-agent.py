@@ -32,7 +32,7 @@ import subprocess
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.3"
+AGENT_VERSION = "0.4"
 DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
@@ -586,10 +586,12 @@ def mainloop():
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
 			for job in responseJson['result']['params']['software-jobs']:
+				if(job['procedure'] == ''): continue
+
 				try:
 
 					print(logtime()+'Begin Software Job '+str(job['id']))
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'message': ''})
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
 					tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
 					tempPath = tempfile.gettempdir()+'/oco-staging'
@@ -597,26 +599,24 @@ def mainloop():
 					payloadparams = { 'hostname' : socket.gethostname(), 'agent-key' : apiKey, 'id' : job['package_id'] }
 					urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
 
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
+
 					if(os.path.exists(tempPath)): removeAll(tempPath)
 					os.mkdir(tempPath)
 
 					with ZipFile(tempZipPath, 'r') as zipObj:
 						zipObj.extractall(tempPath)
 
-					if(job['procedure'] != ""):
-						os.chdir(tempPath)
-						res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-						if res.returncode == 0:
-							jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'message': res.stdout})
-						else:
-							jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': res.stdout})
+					os.chdir(tempPath)
+					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': res.stdout})
 
 					os.chdir(tempfile.gettempdir())
 					removeAll(tempPath)
 
 				except Exception as e:
 					print(logtime()+str(e))
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'message': str(e)})
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
 
 
 ##### MAIN #####
