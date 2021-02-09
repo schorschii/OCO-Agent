@@ -249,11 +249,13 @@ def getGpu():
 	elif "linux" in OS_TYPE:
 		return "?"
 	elif "darwin" in OS_TYPE:
-		command = "system_profiler SPDisplaysDataType -json"
-		jsonstring = os.popen(command).read().strip()
-		jsondata = json.loads(jsonstring)
-		for gpu in jsondata["SPDisplaysDataType"]:
-			return gpu["sppci_model"]
+		try:
+			command = "system_profiler SPDisplaysDataType -json"
+			jsonstring = os.popen(command).read().strip()
+			jsondata = json.loads(jsonstring)
+			for gpu in jsondata["SPDisplaysDataType"]:
+				return gpu["sppci_model"]
+		except Exception as e: return "?"
 
 def getScreens():
 	screens = []
@@ -281,17 +283,19 @@ def getScreens():
 					"resolution": resolution
 				})
 	elif "darwin" in OS_TYPE:
-		command = "system_profiler SPDisplaysDataType -json"
-		jsonstring = os.popen(command).read().strip()
-		jsondata = json.loads(jsonstring)
-		for gpu in jsondata["SPDisplaysDataType"]:
-			for screen in gpu["spdisplays_ndrvs"]:
-				screens.append({
-					"name": screen["_name"],
-					"manufacturer": "", "dpi": "",
-					"resolution": screen["_spdisplays_pixels"].strip(),
-					"type": screen["spdisplays_display_type"]
-				})
+		try:
+			command = "system_profiler SPDisplaysDataType -json"
+			jsonstring = os.popen(command).read().strip()
+			jsondata = json.loads(jsonstring)
+			for gpu in jsondata["SPDisplaysDataType"]:
+				for screen in gpu["spdisplays_ndrvs"]:
+					screens.append({
+						"name": screen["_name"],
+						"manufacturer": "", "dpi": "",
+						"resolution": screen["_spdisplays_pixels"].strip(),
+						"type": screen["spdisplays_display_type"]
+					})
+		except Exception as e: pass
 	return screens
 
 def winPrinterStatus(status, state):
