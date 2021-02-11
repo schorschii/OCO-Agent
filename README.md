@@ -32,7 +32,7 @@ In case of problems, you can debug the agent by manually executing the script in
 No compilation needed, just install all dependencies and oco-agent.service file for systemd.
 ```
 apt install python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip python3-dateutil mokutil
-sudo -H pip3 install utmp
+sudo -H pip3 install utmp pyedid
 
 # move oco-agent.py to /usr/bin and make it executable
 # move oco-agent.ini to /etc
@@ -44,7 +44,7 @@ systemctl start oco-agent
 
 ### macOS
 ```
-pip install plistlib
+pip install pyedid
 
 pyinstaller -F oco-agent.py
 
@@ -58,8 +58,8 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 
 ### Windows
 ```
-pip install pip install requests netifaces urllib3 psutil distro python-dateutil
-pip install wmi
+pip install pip install requests netifaces urllib3 psutil distro python-dateutil pyedid
+pip install wmi pywin32
 
 pyinstaller -F oco-agent.py
 pyinstaller -F --hidden-import=win32timezone service-wrapper.py

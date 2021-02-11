@@ -30,9 +30,12 @@ from dateutil import tz
 import tempfile
 import subprocess
 from zipfile import ZipFile
+from pyedid.edid import Edid
+from pyedid.helpers.edid_helper import EdidHelper
+from pyedid.helpers.registry import Registry
 
 
-AGENT_VERSION = "0.4"
+AGENT_VERSION = "0.5"
 DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
@@ -260,28 +263,56 @@ def getGpu():
 def getScreens():
 	screens = []
 	if "win32" in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_Desktopmonitor():
-			screens.append({
-				"name": o.Name,
-				"manufacturer": o.MonitorManufacturer,
-				"dpi": o.PixelsPerXLogicalInch,
-				"resolution": str(o.ScreenWidth)+" x "+str(o.ScreenHeight),
-				"type": o.DisplayType or "-"
-			})
-	elif "linux" in OS_TYPE:
-		command = "xrandr"
-		lines = os.popen(command).read().strip().splitlines()
-		for display in lines:
-			value = display.split()
-			if(not display.startswith(" ") and value[1] == "connected"):
-				resolution = value[2]
-				if(resolution == "primary"): resolution = value[3];
+		try:
+			from win32com.client import GetObject
+			objWMI = GetObject(r'winmgmts:\\.\root\WMI').InstancesOf('WmiMonitorID')
+			registry = Registry.from_csv('edid.csv')
+		except Exception as e: return screens
+		for monitor in objWMI:
+			try:
+				devPath = monitor.InstanceName.split('_')[0]
+				regPath = 'SYSTEM\\CurrentControlSet\\Enum\\'+devPath+'\\Device Parameters'
+				registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, regPath, 0, winreg.KEY_READ)
+				edid, regtype = winreg.QueryValueEx(registry_key, "EDID")
+				winreg.CloseKey(registry_key)
+				if not edid: continue
+				#print ('DEBUG: EDID Version: '+str(edid[18])+'.'+str(edid[19]))
+				#dtd = 54  # start byte of detailed timing desc.
+				# upper nibble of byte x 2^8 combined with full byte
+				#hres = ((edid[dtd+4] >> 4) << 8) | edid[dtd+2]
+				#vres = ((edid[dtd+7] >> 4) << 8) | edid[dtd+5]
+				edidp = Edid(edid, registry)
+				manufacturer = edidp.manufacturer
+				if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
 				screens.append({
-					"name": value[0],
-					"manufacturer": "", "dpi": "", "type": "",
-					"resolution": resolution
+					"name": edidp.name,
+					"manufacturer": manufacturer,
+					"manufactured": str(edidp.year or "-"),
+					"resolution": str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1]),
+					"size": str(edidp.width)+" x "+str(edidp.height),
+					"type": str(edidp.product or "-"),
+					"serialno": edidp.serial or "-"
 				})
+			except Exception as e: continue
+	elif "linux" in OS_TYPE:
+		try:
+			registry = Registry.from_csv('edid.csv')
+			for edid in EdidHelper.get_edids():
+				try:
+					edidp = Edid(edid, registry)
+					manufacturer = edidp.manufacturer
+					if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
+					screens.append({
+						"name": edidp.name,
+						"manufacturer": manufacturer,
+						"manufactured": str(edidp.year or "-"),
+						"resolution": str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1]),
+						"size": str(edidp.width)+" x "+str(edidp.height),
+						"type": str(edidp.product or "-"),
+						"serialno": edidp.serial or "-"
+					})
+				except Exception as e: continue
+		except Exception as e: return screens
 	elif "darwin" in OS_TYPE:
 		try:
 			command = "system_profiler SPDisplaysDataType -json"
@@ -291,9 +322,11 @@ def getScreens():
 				for screen in gpu["spdisplays_ndrvs"]:
 					screens.append({
 						"name": screen["_name"],
-						"manufacturer": "", "dpi": "",
+						"manufacturer": "", "manufactured": "",
 						"resolution": screen["_spdisplays_pixels"].strip(),
-						"type": screen["spdisplays_display_type"]
+						"size": "",
+						"type": screen["spdisplays_display_type"],
+						"serialno": ""
 					})
 		except Exception as e: pass
 	return screens
