@@ -665,11 +665,11 @@ def mainloop():
 					removeAll(tempPath)
 
 					# execute restart/shutdown
-					if('restart' in job and job['restart'] != None and job['restart'] >= 0):
+					if('restart' in job and job['restart'] != None and isinstance(job['restart'], int) and job['restart'] >= 0):
 						if "win32" in OS_TYPE:
 							res = subprocess.run('shutdown -r -t '+str(int(job['restart'])), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 							if(res.returncode == 0): restartFlag = True
-					if('shutdown' in job and job['shutdown'] != None and job['shutdown'] >= 0):
+					if('shutdown' in job and job['shutdown'] != None and isinstance(job['shutdown'], int) and job['shutdown'] >= 0):
 						if "win32" in OS_TYPE:
 							res = subprocess.run('shutdown -s -t '+str(int(job['shutdown'])), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 							if(res.returncode == 0): restartFlag = True
