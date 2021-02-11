@@ -576,6 +576,8 @@ def daemon():
 # the main server communication function
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
 def mainloop():
+	global restartFlag
+
 	# send initial request
 	print(logtime()+"Sending agent_hello...")
 	data = {
@@ -629,7 +631,12 @@ def mainloop():
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
 			for job in responseJson['result']['params']['software-jobs']:
-				if(job['procedure'] == ''): continue
+				if(job['procedure'] == ''):
+					print(logtime()+'Skipping Software Job '+str(job['id'])+' because procedure is empty.')
+					continue
+				if(restartFlag == True):
+					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
+					continue
 
 				try:
 
@@ -657,6 +664,16 @@ def mainloop():
 					os.chdir(tempfile.gettempdir())
 					removeAll(tempPath)
 
+					# execute restart/shutdown
+					if('restart' in job and job['restart'] != None and job['restart'] >= 0):
+						if "win32" in OS_TYPE:
+							res = subprocess.run('shutdown -r -t '+str(int(job['restart'])), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+							if(res.returncode == 0): restartFlag = True
+					if('shutdown' in job and job['shutdown'] != None and job['shutdown'] >= 0):
+						if "win32" in OS_TYPE:
+							res = subprocess.run('shutdown -s -t '+str(int(job['shutdown'])), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+							if(res.returncode == 0): restartFlag = True
+
 				except Exception as e:
 					print(logtime()+str(e))
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
@@ -682,6 +699,7 @@ try:
 	apiKey = configParser.get("agent", "agent-key")
 	apiUrl = configParser.get("server", "api-url")
 	payloadUrl = configParser.get("server", "payload-url")
+	restartFlag = False
 except Exception as e:
 	print(logtime()+str(e))
 	sys.exit(1)
