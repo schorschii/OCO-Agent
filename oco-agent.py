@@ -44,6 +44,12 @@ if "win32" in OS_TYPE: import wmi, winreg
 
 ##### FUNCTIONS #####
 
+def getHostname():
+	hostname = socket.gethostname()
+	if "darwin" in OS_TYPE:
+		if(hostname.endswith('.local')): hostname = hostname[:-6]
+	return hostname
+
 def getNics():
 	nics = []
 	for interface in netifaces.interfaces():
@@ -493,7 +499,7 @@ def jsonRequest(method, data):
 		"id": 1,
 		"method": method,
 		"params": {
-			"hostname": socket.gethostname(),
+			"hostname": getHostname(),
 			"agent-key": apiKey,
 			"data": data
 		}
@@ -636,7 +642,7 @@ def mainloop():
 					if(job['download'] == True):
 						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
-						payloadparams = { 'hostname' : socket.gethostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
+						payloadparams = { 'hostname' : getHostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
 						urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
 
 						with ZipFile(tempZipPath, 'r') as zipObj:
