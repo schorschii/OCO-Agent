@@ -483,6 +483,21 @@ def getLogins():
 				})
 	return users
 
+def isUserLoggedIn():
+	if "win32" in OS_TYPE:
+		w=wmi.WMI()
+		for u in w.Win32_Process(Name="explorer.exe"):
+			return True
+	elif "linux" in OS_TYPE:
+		command = "who"
+		entries = os.popen(command).read().split("\n")
+		for entry in entries:
+			if(entry.strip() != ""):
+				return True
+	elif "darwin" in OS_TYPE:
+		return True # not implemented
+	return False
+
 def removeAll(path):
 	for root, dirs, files in os.walk(path, topdown=False):
 		for name in files:
@@ -640,12 +655,14 @@ def mainloop():
 
 				try:
 
+					# create temp dir
 					print(logtime()+'Begin Software Job '+str(job['id']))
 					tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
 					tempPath = tempfile.gettempdir()+'/oco-staging'
 					if(os.path.exists(tempPath)): removeAll(tempPath)
 					os.mkdir(tempPath)
 
+					# download if needed
 					if(job['download'] == True):
 						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
@@ -655,23 +672,36 @@ def mainloop():
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							zipObj.extractall(tempPath)
 
+					# change to tmp dir and execute procedure
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
-
 					os.chdir(tempPath)
 					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': res.stdout})
 
+					# cleanup
 					os.chdir(tempfile.gettempdir())
 					removeAll(tempPath)
 
-					# execute restart/shutdown
+					# execute restart if requested
 					if('restart' in job and job['restart'] != None and isinstance(job['restart'], int) and job['restart'] >= 0):
+						timeout = 0
+						if(isUserLoggedIn()): timeout = int(job['restart'])
 						if "win32" in OS_TYPE:
-							res = subprocess.run('shutdown -r -t '+str(int(job['restart'])), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+							res = subprocess.run('shutdown -r -t '+str(timeout*60), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 							if(res.returncode == 0): restartFlag = True
+						else:
+							res = subprocess.run('shutdown -r +'+str(timeout), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+							if(res.returncode == 0): restartFlag = True
+
+					# execute shutdown if requested
 					if('shutdown' in job and job['shutdown'] != None and isinstance(job['shutdown'], int) and job['shutdown'] >= 0):
+						timeout = 0
+						if(isUserLoggedIn()): timeout = int(job['restart'])
 						if "win32" in OS_TYPE:
-							res = subprocess.run('shutdown -s -t '+str(int(job['shutdown'])), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+							res = subprocess.run('shutdown -s -t '+str(timeout*60), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+							if(res.returncode == 0): restartFlag = True
+						else:
+							res = subprocess.run('shutdown -h +'+str(timeout), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 							if(res.returncode == 0): restartFlag = True
 
 				except Exception as e:
