@@ -35,7 +35,7 @@ from pyedid.helpers.edid_helper import EdidHelper
 from pyedid.helpers.registry import Registry
 
 
-AGENT_VERSION = "0.5"
+AGENT_VERSION = "0.6"
 DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
@@ -366,22 +366,22 @@ def getPrinters():
 			})
 	elif "linux" in OS_TYPE or "darwin" in OS_TYPE:
 		CUPS_CONFIG = "/etc/cups/printers.conf"
-		if(os.path.exists(CUPS_CONFIG)):
-			with open(CUPS_CONFIG) as file:
-				printer = {"name": "", "driver": "", "paper": "", "dpi": "", "uri": "", "status": ""}
-				for line in file:
-					l = line.rstrip("\n")
-					if(l.startswith("<DefaultPrinter ") or l.startswith("<Printer ")):
-						printer = {
-							"name": l.split(" ", 1)[1].rstrip(">"),
-							"driver": "", "paper": "", "dpi": "", "uri": "", "status": ""
-						}
-					if(l.startswith("MakeModel ")):
-						printer["driver"] = l.split(" ", 1)[1]
-					if(l.startswith("DeviceURI ")):
-						printer["uri"] = l.split(" ", 1)[1]
-					if(l.startswith("</DefaultPrinter>") or l.startswith("</Printer>")):
-						if(printer["name"] != ""): printers.append(printer)
+		if(not os.path.exists(CUPS_CONFIG)): return printers
+		with open(CUPS_CONFIG, 'r', encoding='utf-8', errors='replace') as file:
+			printer = {"name": "", "driver": "", "paper": "", "dpi": "", "uri": "", "status": ""}
+			for line in file:
+				l = line.rstrip("\n")
+				if(l.startswith("<DefaultPrinter ") or l.startswith("<Printer ")):
+					printer = {
+						"name": l.split(" ", 1)[1].rstrip(">"),
+						"driver": "", "paper": "", "dpi": "", "uri": "", "status": ""
+					}
+				if(l.startswith("MakeModel ")):
+					printer["driver"] = l.split(" ", 1)[1]
+				if(l.startswith("DeviceURI ")):
+					printer["uri"] = l.split(" ", 1)[1]
+				if(l.startswith("</DefaultPrinter>") or l.startswith("</Printer>")):
+					if(printer["name"] != ""): printers.append(printer)
 	return printers
 
 def getPartitions():
