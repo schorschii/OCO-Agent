@@ -524,7 +524,7 @@ def jsonRequest(method, data):
 	try:
 		# send request
 		if(DEBUG): print(logtime()+"< " + data_json)
-		response = requests.post(apiUrl, data=data_json, headers=headers)
+		response = requests.post(apiUrl, data=data_json, headers=headers, timeout=connectionTimeout)
 
 		# print response
 		if(DEBUG): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
@@ -666,6 +666,7 @@ def mainloop():
 					if(job['download'] == True):
 						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
+						socket.setdefaulttimeout(connectionTimeout)
 						payloadparams = { 'hostname' : getHostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
 						urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
 
@@ -725,6 +726,9 @@ try:
 	configParser = configparser.RawConfigParser()
 	configParser.read(configFilePath)
 	DEBUG = (int(configParser.get("agent", "debug")) == 1)
+	connectionTimeout = 8
+	if(configParser.has_option("agent", "connection-timeout")):
+		connectionTimeout = int(configParser.get("agent", "connection-timeout"))
 	queryInterval = int(configParser.get("agent", "query-interval"))
 	apiKey = configParser.get("agent", "agent-key")
 	apiUrl = configParser.get("server", "api-url")
