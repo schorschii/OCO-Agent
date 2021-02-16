@@ -35,7 +35,7 @@ from pyedid.helpers.edid_helper import EdidHelper
 from pyedid.helpers.registry import Registry
 
 
-AGENT_VERSION = "0.6"
+AGENT_VERSION = "0.6.1"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
