@@ -274,33 +274,33 @@ def getScreens():
 			from win32com.client import GetObject
 			objWMI = GetObject(r'winmgmts:\\.\root\WMI').InstancesOf('WmiMonitorID')
 			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
-		except Exception as e: return screens
-		for monitor in objWMI:
-			try:
-				devPath = monitor.InstanceName.split('_')[0]
-				regPath = 'SYSTEM\\CurrentControlSet\\Enum\\'+devPath+'\\Device Parameters'
-				registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, regPath, 0, winreg.KEY_READ)
-				edid, regtype = winreg.QueryValueEx(registry_key, "EDID")
-				winreg.CloseKey(registry_key)
-				if not edid: continue
-				#print ('DEBUG: EDID Version: '+str(edid[18])+'.'+str(edid[19]))
-				#dtd = 54  # start byte of detailed timing desc.
-				# upper nibble of byte x 2^8 combined with full byte
-				#hres = ((edid[dtd+4] >> 4) << 8) | edid[dtd+2]
-				#vres = ((edid[dtd+7] >> 4) << 8) | edid[dtd+5]
-				edidp = Edid(edid, registry)
-				manufacturer = edidp.manufacturer
-				if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
-				screens.append({
-					"name": edidp.name,
-					"manufacturer": manufacturer,
-					"manufactured": str(edidp.year or "-"),
-					"resolution": str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1]),
-					"size": str(edidp.width)+" x "+str(edidp.height),
-					"type": str(edidp.product or "-"),
-					"serialno": edidp.serial or "-"
-				})
-			except Exception as e: print(logtime()+str(e))
+			for monitor in objWMI:
+				try:
+					devPath = monitor.InstanceName.split('_')[0]
+					regPath = 'SYSTEM\\CurrentControlSet\\Enum\\'+devPath+'\\Device Parameters'
+					registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, regPath, 0, winreg.KEY_READ)
+					edid, regtype = winreg.QueryValueEx(registry_key, "EDID")
+					winreg.CloseKey(registry_key)
+					if not edid: continue
+					#print ('DEBUG: EDID Version: '+str(edid[18])+'.'+str(edid[19]))
+					#dtd = 54  # start byte of detailed timing desc.
+					# upper nibble of byte x 2^8 combined with full byte
+					#hres = ((edid[dtd+4] >> 4) << 8) | edid[dtd+2]
+					#vres = ((edid[dtd+7] >> 4) << 8) | edid[dtd+5]
+					edidp = Edid(edid, registry)
+					manufacturer = edidp.manufacturer
+					if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
+					screens.append({
+						"name": edidp.name,
+						"manufacturer": manufacturer,
+						"manufactured": str(edidp.year or "-"),
+						"resolution": str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1]),
+						"size": str(edidp.width)+" x "+str(edidp.height),
+						"type": str(edidp.product or "-"),
+						"serialno": edidp.serial or "-"
+					})
+				except Exception as e: print(logtime()+str(e))
+		except Exception as e: print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
 		try:
 			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
@@ -318,8 +318,8 @@ def getScreens():
 						"type": str(edidp.product or "-"),
 						"serialno": edidp.serial or "-"
 					})
-				except Exception as e: continue
-		except Exception as e: return screens
+				except Exception as e: print(logtime()+str(e))
+		except Exception as e: print(logtime()+str(e))
 	elif "darwin" in OS_TYPE:
 		try:
 			command = "system_profiler SPDisplaysDataType -json"
@@ -335,7 +335,7 @@ def getScreens():
 						"type": screen["spdisplays_display_type"],
 						"serialno": ""
 					})
-		except Exception as e: pass
+		except Exception as e: print(logtime()+str(e))
 	return screens
 
 def winPrinterStatus(status, state):
