@@ -36,7 +36,8 @@ from pyedid.helpers.registry import Registry
 
 
 AGENT_VERSION = "0.6"
-DEFAULT_CONFIG_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))+"/oco-agent.ini"
+EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
+DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
 if "win32" in OS_TYPE: import wmi, winreg
@@ -272,7 +273,7 @@ def getScreens():
 		try:
 			from win32com.client import GetObject
 			objWMI = GetObject(r'winmgmts:\\.\root\WMI').InstancesOf('WmiMonitorID')
-			registry = Registry.from_csv('edid.csv')
+			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 		except Exception as e: return screens
 		for monitor in objWMI:
 			try:
@@ -299,10 +300,10 @@ def getScreens():
 					"type": str(edidp.product or "-"),
 					"serialno": edidp.serial or "-"
 				})
-			except Exception as e: continue
+			except Exception as e: print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
 		try:
-			registry = Registry.from_csv('edid.csv')
+			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 			for edid in EdidHelper.get_edids():
 				try:
 					edidp = Edid(edid, registry)
