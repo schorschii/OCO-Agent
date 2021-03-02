@@ -29,6 +29,7 @@ import datetime
 from dateutil import tz
 import tempfile
 import subprocess
+import shlex
 from zipfile import ZipFile
 from pyedid.edid import Edid
 from pyedid.helpers.edid_helper import EdidHelper
@@ -267,6 +268,26 @@ def getGpu():
 				return gpu["sppci_model"]
 		except Exception as e: return "?"
 
+def getLinuxXAuthority():
+	try:
+		# LightDM
+		for i in range(10):
+			checkFile = "/var/run/lightdm/root/:"+str(i)
+			if(os.path.exists(checkFile)):
+				return {"file":checkFile, "display":":"+str(i)}
+		# GDM
+		command = "who|grep -E '\(:[0-9](\.[0-9])*\)'|awk '{print $1$NF}'|sort -u"
+		for l in os.popen(command).read().split("\n"):
+			if(l.strip() == ""): continue
+			display = l.split("(")[1].split(")")[0]
+			username = l.split("(")[0]
+			userid = os.popen("id -u "+shlex.quote(username)).read().strip()
+			checkFile = "/run/user/"+str(int(userid))+"/gdm/Xauthority"
+			if(os.path.exists(checkFile)):
+				return {"file":checkFile, "display":display}
+	except Exception as e:
+		print(logtime()+str(e))
+	return None
 def getScreens():
 	screens = []
 	if "win32" in OS_TYPE:
@@ -303,8 +324,10 @@ def getScreens():
 		except Exception as e: print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
 		try:
-			os.environ["XAUTHORITY"] = "/var/run/lightdm/root/:0"
-			os.environ["DISPLAY"] = ":0"
+			xAuthority = getLinuxXAuthority()
+			if(xAuthority != None):
+				os.environ["XAUTHORITY"] = xAuthority['file']
+				os.environ["DISPLAY"] = xAuthority['display']
 			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 			for edid in EdidHelper.get_edids():
 				try:
