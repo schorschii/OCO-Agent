@@ -35,7 +35,7 @@ from pyedid.helpers.edid_helper import EdidHelper
 from pyedid.helpers.registry import Registry
 
 
-AGENT_VERSION = "0.6.2"
+AGENT_VERSION = "0.6.3"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -303,6 +303,8 @@ def getScreens():
 		except Exception as e: print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
 		try:
+			os.environ["XAUTHORITY"] = "/var/run/lightdm/root/:0"
+			os.environ["DISPLAY"] = ":0"
 			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 			for edid in EdidHelper.get_edids():
 				try:
