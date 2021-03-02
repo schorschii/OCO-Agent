@@ -729,7 +729,7 @@ try:
 	configParser = configparser.RawConfigParser()
 	configParser.read(configFilePath)
 	DEBUG = (int(configParser.get("agent", "debug")) == 1)
-	connectionTimeout = 8
+	connectionTimeout = 12
 	if(configParser.has_option("agent", "connection-timeout")):
 		connectionTimeout = int(configParser.get("agent", "connection-timeout"))
 	queryInterval = int(configParser.get("agent", "query-interval"))
