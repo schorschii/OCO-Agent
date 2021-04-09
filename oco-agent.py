@@ -488,14 +488,14 @@ def getLogins():
 			# parse event result set
 			consolidatedEventList = []
 			for event in query:
-				eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"",
+				eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"", "LogonProcessName":"",
 					"TimeCreated":event.System.TimeCreated["SystemTime"] }
 				# put data of interest to dict
 				for data in event.EventData.Data:
-					if(data["Name"] == "TargetUserSid" or data["Name"] == "TargetUserName" or data["Name"] == "TargetDomainName" or data["Name"] == "LogonType" or data["Name"] == "IpAddress"):
+					if(data["Name"] == "TargetUserSid" or data["Name"] == "TargetUserName" or data["Name"] == "TargetDomainName" or data["Name"] == "LogonType" or data["Name"] == "IpAddress" or data["Name"] == "LogonProcessName"):
 						eventDict[data["Name"]] = data.cdata
 				# eliminate duplicates and curious system logins
-				if eventDict not in consolidatedEventList and eventDict["TargetUserSid"] != "S-1-5-90-0-2" and eventDict["TargetUserSid"] != "S-1-5-96-0-2":
+				if eventDict not in consolidatedEventList and eventDict["LogonProcessName"].strip() == "User32":
 					consolidatedEventList.append(eventDict)
 				for event in consolidatedEventList:
 					# example timestamp: 2021-04-09T13:47:14.719737700Z
