@@ -30,6 +30,7 @@ from dateutil import tz
 import tempfile
 import subprocess
 import shlex
+from sys import getwindowsversion
 from zipfile import ZipFile
 from pyedid.edid import Edid
 from pyedid.helpers.edid_helper import EdidHelper
@@ -76,7 +77,8 @@ def getOs():
 
 def getOsVersion():
 	if "win32" in OS_TYPE:
-		return platform.platform()
+		v = getwindowsversion()
+		return (str(v.major)+"."+str(v.minor)+"."+str(v.build)+" "+v.service_pack).strip()
 	elif "linux" in OS_TYPE:
 		return distro.version()
 	elif "darwin" in OS_TYPE:
