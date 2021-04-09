@@ -59,7 +59,12 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 ### Windows
 ```
 pip install pip install requests netifaces urllib3 psutil distro python-dateutil pyedid
-pip install wmi pywin32
+pip install wmi pywin32 winevt  # Windows specific modules
+
+# since of April 2021, winevt has two bugs which prevents oco-agent from successfully parsing windows logins
+# if necessary, please apply the following patches manually to winevt library before compiling the agent
+# https://github.com/bannsec/winevt/pull/13/files
+# https://github.com/bannsec/winevt/pull/12/files
 
 pyinstaller -F oco-agent.py
 pyinstaller -F --hidden-import=win32timezone service-wrapper.py
