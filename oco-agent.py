@@ -471,15 +471,37 @@ def getPartitions():
 def getLogins():
 	users = []
 	if "win32" in OS_TYPE:
-		w = wmi.WMI()
-		for u in w.Win32_NetworkLoginProfile():
-			if(hasattr(u, "LastLogon") and hasattr(u, "NumberOfLogons") and u.LastLogon != None and u.NumberOfLogons != 0):
-				# example timestamp: 20201011200012.000000+120
-				dateObject = datetime.datetime.strptime(u.LastLogon[:-4], "%Y%m%d%H%M%S.%f")
-				dateObject -= datetime.timedelta(minutes=int(u.LastLogon[-4:])) # subtract to get UTC time
+		# Logon Types
+		#  2: Interactive (local console)
+		#  3: Network (access to network shares and printers)
+		#  4: Batch (scheduled tasks)
+		#  5: Service
+		#  7: Unlock
+		#  8: NetworkCleartext
+		#  9: NewCredentials (users executes program as another user using "runas")
+		#  10: RemoteInteractive (RDP)
+		#  11: CachedInteractive (local console without connection to AD server)
+		from winevt import EventLog
+		# query login events
+		query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10']) and System[(EventID='4624')]]</Select></Query></QueryList>")
+		# parse event result set
+		consolidatedEventList = []
+		for event in query:
+			eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"",
+				"TimeCreated":event.System.TimeCreated["SystemTime"] }
+			# put data of interest to dict
+			for data in event.EventData.Data:
+				if(data["Name"] == "TargetUserSid" or data["Name"] == "TargetUserName" or data["Name"] == "TargetDomainName" or data["Name"] == "LogonType" or data["Name"] == "IpAddress"):
+					eventDict[data["Name"]] = data.cdata
+			# eliminate duplicates and curious system logins
+			if eventDict not in consolidatedEventList and eventDict["TargetUserSid"] != "S-1-5-90-0-2" and eventDict["TargetUserSid"] != "S-1-5-96-0-2":
+				consolidatedEventList.append(eventDict)
+			for event in consolidatedEventList:
+				# example timestamp: 2021-04-09T13:47:14.719737700Z
+				dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
 				users.append({
-					"username": u.Caption, # u.Name -> with domain
-					"console": u.NumberOfLogons,
+					"username": event["TargetUserName"]
+					"console": event["IpAddress"],
 					"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
 				})
 	elif "linux" in OS_TYPE:
