@@ -481,29 +481,32 @@ def getLogins():
 		#  9: NewCredentials (users executes program as another user using "runas")
 		#  10: RemoteInteractive (RDP)
 		#  11: CachedInteractive (local console without connection to AD server)
-		from winevt import EventLog
-		# query login events
-		query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10']) and System[(EventID='4624')]]</Select></Query></QueryList>")
-		# parse event result set
-		consolidatedEventList = []
-		for event in query:
-			eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"",
-				"TimeCreated":event.System.TimeCreated["SystemTime"] }
-			# put data of interest to dict
-			for data in event.EventData.Data:
-				if(data["Name"] == "TargetUserSid" or data["Name"] == "TargetUserName" or data["Name"] == "TargetDomainName" or data["Name"] == "LogonType" or data["Name"] == "IpAddress"):
-					eventDict[data["Name"]] = data.cdata
-			# eliminate duplicates and curious system logins
-			if eventDict not in consolidatedEventList and eventDict["TargetUserSid"] != "S-1-5-90-0-2" and eventDict["TargetUserSid"] != "S-1-5-96-0-2":
-				consolidatedEventList.append(eventDict)
-			for event in consolidatedEventList:
-				# example timestamp: 2021-04-09T13:47:14.719737700Z
-				dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
-				users.append({
-					"username": event["TargetUserName"]
-					"console": event["IpAddress"],
-					"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
-				})
+		try:
+			from winevt import EventLog
+			# query login events
+			query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10']) and System[(EventID='4624')]]</Select></Query></QueryList>")
+			# parse event result set
+			consolidatedEventList = []
+			for event in query:
+				eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"",
+					"TimeCreated":event.System.TimeCreated["SystemTime"] }
+				# put data of interest to dict
+				for data in event.EventData.Data:
+					if(data["Name"] == "TargetUserSid" or data["Name"] == "TargetUserName" or data["Name"] == "TargetDomainName" or data["Name"] == "LogonType" or data["Name"] == "IpAddress"):
+						eventDict[data["Name"]] = data.cdata
+				# eliminate duplicates and curious system logins
+				if eventDict not in consolidatedEventList and eventDict["TargetUserSid"] != "S-1-5-90-0-2" and eventDict["TargetUserSid"] != "S-1-5-96-0-2":
+					consolidatedEventList.append(eventDict)
+				for event in consolidatedEventList:
+					# example timestamp: 2021-04-09T13:47:14.719737700Z
+					dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
+					users.append({
+						"username": event["TargetUserName"]
+						"console": event["IpAddress"],
+						"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
+					})
+		except Exception as e:
+			print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
 		import utmp
 		with open("/var/log/wtmp", "rb") as fd:
