@@ -501,7 +501,7 @@ def getLogins():
 					# example timestamp: 2021-04-09T13:47:14.719737700Z
 					dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
 					users.append({
-						"username": event["TargetUserName"]
+						"username": event["TargetUserName"],
 						"console": event["IpAddress"],
 						"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
 					})
