@@ -30,7 +30,6 @@ from dateutil import tz
 import tempfile
 import subprocess
 import shlex
-from sys import getwindowsversion
 from zipfile import ZipFile
 from pyedid.edid import Edid
 from pyedid.helpers.edid_helper import EdidHelper
