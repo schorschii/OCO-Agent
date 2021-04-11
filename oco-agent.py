@@ -370,19 +370,28 @@ def getScreens():
 		except Exception as e: print(logtime()+str(e))
 	elif "darwin" in OS_TYPE:
 		try:
+			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 			command = "system_profiler SPDisplaysDataType -json"
 			jsonstring = os.popen(command).read().strip()
 			jsondata = json.loads(jsonstring)
 			for gpu in jsondata["SPDisplaysDataType"]:
 				for screen in gpu["spdisplays_ndrvs"]:
-					screens.append({
-						"name": screen["_name"],
-						"manufacturer": "", "manufactured": "",
-						"resolution": screen["_spdisplays_pixels"].strip(),
-						"size": "",
-						"type": screen["spdisplays_display_type"],
-						"serialno": ""
-					})
+					try:
+						edidp = Edid(EdidHelper.hex2bytes(screen["_spdisplays_edid"].replace("0x","")), registry)
+						manufacturer = edidp.manufacturer
+						resolution = "-" # MacBook internal screens do not provide resolution data :'(
+						if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
+						if(len(edidp.resolutions) > 0): resolution = str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1])
+						screens.append({
+							"name": edidp.name,
+							"manufacturer": manufacturer,
+							"manufactured": str(edidp.year or "-"),
+							"resolution": resolution,
+							"size": str(edidp.width)+" x "+str(edidp.height),
+							"type": str(edidp.product or "-"),
+							"serialno": edidp.serial or "-"
+						})
+					except Exception as e: print(logtime()+str(e))
 		except Exception as e: print(logtime()+str(e))
 	return screens
 
