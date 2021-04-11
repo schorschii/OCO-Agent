@@ -85,7 +85,7 @@ def getOsVersion():
 			registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows NT\CurrentVersion", 0, winreg.KEY_READ)
 			try:
 				# read CurrentMajorVersionNumber/CurrentMinorVersionNumber if exists (only Windows 10)
-				# the value "CurrentVersion" always shows "6.3" on Windows 10...
+				# the value "CurrentVersion" always shows "6.3" on Windows 10, great job Microsoft...
 				valueMajor, regtype = winreg.QueryValueEx(registry_key, "CurrentMajorVersionNumber")
 				valueMinor, regtype = winreg.QueryValueEx(registry_key, "CurrentMinorVersionNumber")
 				valueBuild, regtype = winreg.QueryValueEx(registry_key, "CurrentBuildNumber")
@@ -631,7 +631,7 @@ def lockCheck():
 		with open(LOCKFILE_PATH, 'x') as lockfile:
 			pid = str(os.getpid())
 			lockfile.write(pid)
-			print(logtime()+"OCO Agent starting with Lockfile (pid "+pid+")...")
+			print(logtime()+"OCO Agent starting with lock file (pid "+pid+")...")
 	except IOError:
 		# there is a lock file - check if pid from lockfile is still active
 		with open(LOCKFILE_PATH, 'r') as lockfile:
@@ -647,22 +647,22 @@ def lockCheck():
 			except Exception: pass
 			if(alreadyRunning):
 				# another instance is still running -> exit
-				print(logtime()+"OCO Agent already running at pid "+str(oldpid)+" (Lockfile "+LOCKFILE_PATH+"). Exiting.")
+				print(logtime()+"OCO Agent already running at pid "+str(oldpid)+" (lock file "+LOCKFILE_PATH+"). Exiting.")
 				sys.exit()
 			else:
 				# process is not running anymore -> delete lockfile and start agent
-				print(logtime()+"Cleaning up orphaned lockfile (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
+				print(logtime()+"Cleaning up orphaned lock file (pid "+str(oldpid)+" is not running anymore) and starting OCO Agent...")
 				os.unlink(LOCKFILE_PATH)
 				with open(LOCKFILE_PATH, 'x') as lockfile:
 					pid = str(os.getpid())
 					lockfile.write(pid)
-					print(logtime()+"OCO Agent starting with Lockfile (pid "+pid+")...")
+					print(logtime()+"OCO Agent starting with lock file (pid "+pid+")...")
 	atexit.register(lockClean, lockfile)
 # clean up lockfile
 def lockClean(lockfile):
 	lockfile.close()
 	os.unlink(LOCKFILE_PATH)
-	print(logtime()+"Closing lockfile and exiting.")
+	print(logtime()+"Closing lock file and exiting.")
 
 # the daemon function - calls mainloop() in endless loop
 def daemon():
