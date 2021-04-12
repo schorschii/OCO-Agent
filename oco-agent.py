@@ -514,7 +514,7 @@ def getLogins():
 		try:
 			from winevt import EventLog
 			# query login events
-			query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10']) and System[(EventID='4624')]]</Select></Query></QueryList>")
+			query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
 			# parse event result set
 			consolidatedEventList = []
 			for event in query:
