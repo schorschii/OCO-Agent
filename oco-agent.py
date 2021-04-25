@@ -261,6 +261,11 @@ def getLocale():
 		for o in w.Win32_OperatingSystem():
 			return o.Locale
 		return "?"
+	elif "darwin" in OS_TYPE:
+		try:
+			command = "osascript -e 'user locale of (get system info)'"
+			return os.popen(command).read().strip()
+		except Exception as e: print(logtime()+str(e))
 	else: return "-"
 
 def getCpu():
