@@ -34,7 +34,7 @@ import pyedid
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.7.0"
+AGENT_VERSION = "0.8.0"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
