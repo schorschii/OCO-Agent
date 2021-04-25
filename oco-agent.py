@@ -30,10 +30,8 @@ from dateutil import tz
 import tempfile
 import subprocess
 import shlex
+import pyedid
 from zipfile import ZipFile
-from pyedid.edid import Edid
-from pyedid.helpers.edid_helper import EdidHelper
-from pyedid.helpers.registry import Registry
 
 
 AGENT_VERSION = "0.7.0"
@@ -317,7 +315,6 @@ def getScreens():
 		try:
 			from win32com.client import GetObject
 			objWMI = GetObject(r'winmgmts:\\.\root\WMI').InstancesOf('WmiMonitorID')
-			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 			for monitor in objWMI:
 				try:
 					devPath = monitor.InstanceName.split('_')[0]
@@ -331,8 +328,8 @@ def getScreens():
 					# upper nibble of byte x 2^8 combined with full byte
 					#hres = ((edid[dtd+4] >> 4) << 8) | edid[dtd+2]
 					#vres = ((edid[dtd+7] >> 4) << 8) | edid[dtd+5]
-					edidp = Edid(edid, registry)
-					manufacturer = edidp.manufacturer
+					edidp = pyedid.parse_edid(edid)
+					manufacturer = edidp.manufacturer or "Unknown"
 					if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
 					screens.append({
 						"name": edidp.name,
@@ -340,8 +337,9 @@ def getScreens():
 						"manufactured": str(edidp.year or "-"),
 						"resolution": str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1]),
 						"size": str(edidp.width)+" x "+str(edidp.height),
-						"type": str(edidp.product or "-"),
-						"serialno": edidp.serial or "-"
+						"type": str(edidp.product_id or "-"),
+						"serialno": edidp.serial or "-",
+						"technology": str(edidp.type or "-")
 					})
 				except Exception as e: print(logtime()+str(e))
 		except Exception as e: print(logtime()+str(e))
@@ -351,11 +349,11 @@ def getScreens():
 			if(xAuthority != None):
 				os.environ["XAUTHORITY"] = xAuthority['file']
 				os.environ["DISPLAY"] = xAuthority['display']
-			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
-			for edid in EdidHelper.get_edids():
+			randr = subprocess.check_output(['xrandr', '--verbose'])
+			for edid in pyedid.get_edid_from_xrandr_verbose(randr):
 				try:
-					edidp = Edid(edid, registry)
-					manufacturer = edidp.manufacturer
+					edidp = pyedid.parse_edid(edid)
+					manufacturer = edidp.manufacturer or "Unknown"
 					if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
 					screens.append({
 						"name": edidp.name,
@@ -363,22 +361,22 @@ def getScreens():
 						"manufactured": str(edidp.year or "-"),
 						"resolution": str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1]),
 						"size": str(edidp.width)+" x "+str(edidp.height),
-						"type": str(edidp.product or "-"),
-						"serialno": edidp.serial or "-"
+						"type": str(edidp.product_id or "-"),
+						"serialno": edidp.serial or "-",
+						"technology": str(edidp.type or "-")
 					})
 				except Exception as e: print(logtime()+str(e))
 		except Exception as e: print(logtime()+str(e))
 	elif "darwin" in OS_TYPE:
 		try:
-			registry = Registry.from_csv(EXECUTABLE_PATH+'/edid.csv')
 			command = "system_profiler SPDisplaysDataType -json"
 			jsonstring = os.popen(command).read().strip()
 			jsondata = json.loads(jsonstring)
 			for gpu in jsondata["SPDisplaysDataType"]:
 				for screen in gpu["spdisplays_ndrvs"]:
 					try:
-						edidp = Edid(EdidHelper.hex2bytes(screen["_spdisplays_edid"].replace("0x","")), registry)
-						manufacturer = edidp.manufacturer
+						edidp = pyedid.parse_edid(screen["_spdisplays_edid"].replace("0x",""))
+						manufacturer = edidp.manufacturer or "Unknown"
 						resolution = "-" # MacBook internal screens do not provide resolution data :'(
 						if(manufacturer == "Unknown"): manufacturer += " ("+str(edidp.manufacturer_id)+")"
 						if(len(edidp.resolutions) > 0): resolution = str(edidp.resolutions[-1][0])+" x "+str(edidp.resolutions[-1][1])
@@ -388,8 +386,9 @@ def getScreens():
 							"manufactured": str(edidp.year or "-"),
 							"resolution": resolution,
 							"size": str(edidp.width)+" x "+str(edidp.height),
-							"type": str(edidp.product or "-"),
-							"serialno": edidp.serial or "-"
+							"type": str(edidp.product_id or "-"),
+							"serialno": edidp.serial or "-",
+							"technology": str(edidp.type or "-")
 						})
 					except Exception as e: print(logtime()+str(e))
 		except Exception as e: print(logtime()+str(e))
