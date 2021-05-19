@@ -671,7 +671,8 @@ def lockClean(lockfile):
 # the daemon function - calls mainloop() in endless loop
 def daemon():
 	while(True):
-		mainloop()
+		try: mainloop()
+		except KeyError as e: print(logtime()+"KeyError: "+str(e))
 		print(logtime()+"Running in daemon mode. Waiting "+str(queryInterval)+" seconds to send next request.")
 		time.sleep(queryInterval)
 
@@ -692,12 +693,24 @@ def mainloop():
 	if(request != None and request.status_code == 200):
 		responseJson = request.json()
 
+		# save server key if server key is not already set in local config
+		global serverKey
+		if(serverKey == None or serverKey == ""):
+			print(logtime()+"Write new config with updated server key...")
+			configParser.set("server", "server-key", responseJson["result"]["params"]["server-key"])
+			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
+			serverKey = configParser.get("server", "server-key")
+
+		# check server key
+		if(serverKey != responseJson["result"]["params"]["server-key"]):
+			print(logtime()+"!!! Invalid server key, abort.")
+			return
+
 		# update agent key if requested
 		if(responseJson["result"]["params"]["agent-key"] != None):
 			print(logtime()+"Write new config with updated agent key...")
 			configParser.set("agent", "agent-key", responseJson["result"]["params"]["agent-key"])
-			with open(args.config, 'w') as fileHandle:
-				configParser.write(fileHandle)
+			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
 			global apiKey
 			apiKey = configParser.get("agent", "agent-key")
 
@@ -820,6 +833,9 @@ try:
 	apiKey = configParser.get("agent", "agent-key")
 	apiUrl = configParser.get("server", "api-url")
 	payloadUrl = configParser.get("server", "payload-url")
+	serverKey = ""
+	if(configParser.has_option("server", "server-key")):
+		serverKey = configParser.get("server", "server-key")
 	restartFlag = False
 except Exception as e:
 	print(logtime()+str(e))
@@ -833,4 +849,7 @@ if(daemonMode == True):
 # execute the agent once
 else:
 	lockCheck()
-	mainloop()
+	try: mainloop()
+	except KeyError as e:
+		print(logtime()+"KeyError: "+str(e))
+		sys.exit(1)
