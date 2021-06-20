@@ -83,7 +83,8 @@ def getNics():
 						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "domain":domain})
 		if(netifaces.AF_LINK in ifaddrs):
 			for ether in ifaddrs[netifaces.AF_LINK]:
-				if(ether["addr"] == "00:00:00:00:00:00"): continue
+				if(ether["addr"].strip() == ""): continue
+				if(ether["addr"].startswith("00:00:00:00:00:00")): continue
 				if(not ether["addr"] in mentionedMacs):
 					nics.append({"addr":"-", "netmask":"-", "broadcast":"-", "mac":ether["addr"], "domain":domain})
 	return nics
