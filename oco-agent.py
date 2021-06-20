@@ -53,15 +53,39 @@ def getHostname():
 def getNics():
 	nics = []
 	for interface in netifaces.interfaces():
-		if(netifaces.AF_INET in netifaces.ifaddresses(interface)):
-			ineta = netifaces.ifaddresses(interface)[netifaces.AF_INET][0]
-			if(ineta["addr"] == "127.0.0.1"): continue
-			if(netifaces.AF_LINK in netifaces.ifaddresses(interface)):
-				ineta["mac"] = netifaces.ifaddresses(interface)[netifaces.AF_LINK][0]["addr"]
-			else:
-				ineta["mac"] = "?"
-			ineta["domain"] = socket.getfqdn()
-			nics.append(ineta)
+		ifaddrs = netifaces.ifaddresses(interface)
+		domain = str(interface)+" @ "+socket.getfqdn()
+		mentionedMacs = []
+		if(netifaces.AF_INET in ifaddrs):
+			for ineta in ifaddrs[netifaces.AF_INET]:
+				if(ineta["addr"] == "127.0.0.1"): continue
+				addr = ineta["addr"]
+				netmask = ineta["netmask"]
+				broadcast = ineta["broadcast"]
+				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
+					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "domain":domain})
+				else:
+					for ether in ifaddrs[netifaces.AF_LINK]:
+						mentionedMacs.append(ether["addr"])
+						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "domain":domain})
+		if(netifaces.AF_INET6 in ifaddrs):
+			for ineta in ifaddrs[netifaces.AF_INET6]:
+				if(ineta["addr"] == "::1"): continue
+				if(ineta["addr"].startswith("fe80")): continue
+				addr = ineta["addr"]
+				netmask = ineta["netmask"] if "netmask" in ineta else "-"
+				broadcast = ineta["broadcast"] if "broadcast" in ineta else "-"
+				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
+					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "domain":domain})
+				else:
+					for ether in ifaddrs[netifaces.AF_LINK]:
+						mentionedMacs.append(ether["addr"])
+						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "domain":domain})
+		if(netifaces.AF_LINK in ifaddrs):
+			for ether in ifaddrs[netifaces.AF_LINK]:
+				if(ether["addr"] == "00:00:00:00:00:00"): continue
+				if(not ether["addr"] in mentionedMacs):
+					nics.append({"addr":"-", "netmask":"-", "broadcast":"-", "mac":ether["addr"], "domain":domain})
 	return nics
 
 def getOs():
