@@ -770,8 +770,9 @@ def mainloop():
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
 			for job in responseJson['result']['params']['software-jobs']:
-				if(job['procedure'] == ''):
-					print(logtime()+'Skipping Software Job '+str(job['id'])+' because procedure is empty.')
+				if(job['procedure'].strip() == ''):
+					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
+					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': '-'})
 					continue
 				if(restartFlag == True):
 					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
