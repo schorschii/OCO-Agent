@@ -52,10 +52,10 @@ def getHostname():
 
 def getNics():
 	nics = []
+	mentionedMacs = []
 	for interface in netifaces.interfaces():
 		ifaddrs = netifaces.ifaddresses(interface)
 		domain = str(interface)+" @ "+socket.getfqdn()
-		mentionedMacs = []
 		if(netifaces.AF_INET in ifaddrs):
 			for ineta in ifaddrs[netifaces.AF_INET]:
 				if(ineta["addr"] == "127.0.0.1"): continue
