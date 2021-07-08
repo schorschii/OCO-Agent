@@ -831,6 +831,11 @@ def mainloop():
 							res = subprocess.run('shutdown -h +'+str(timeout), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 							if(res.returncode == 0): restartFlag = True
 
+					# execute agent exit if requested (for agent update)
+					if('exit' in job and job['exit'] != None and isinstance(job['exit'], int) and job['exit'] >= 0):
+						print(logtime()+'Agent Shutdown Requested. Bye... ')
+						sys.exit(0)
+
 				except Exception as e:
 					print(logtime()+str(e))
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
