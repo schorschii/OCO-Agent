@@ -833,7 +833,7 @@ def mainloop():
 
 					# execute agent exit if requested (for agent update)
 					if('exit' in job and job['exit'] != None and isinstance(job['exit'], int) and job['exit'] >= 0):
-						print(logtime()+'Agent Shutdown Requested. Bye... ')
+						print(logtime()+'Agent Exit Requested. Bye...')
 						sys.exit(0)
 
 				except Exception as e:
