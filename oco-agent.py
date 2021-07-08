@@ -839,6 +839,7 @@ def mainloop():
 				except Exception as e:
 					print(logtime()+str(e))
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
+					os.chdir(tempfile.gettempdir())
 
 
 ##### MAIN #####
