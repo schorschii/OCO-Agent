@@ -34,7 +34,7 @@ import pyedid
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.8.0"
+AGENT_VERSION = "0.9.1"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -55,7 +55,7 @@ def getNics():
 	mentionedMacs = []
 	for interface in netifaces.interfaces():
 		ifaddrs = netifaces.ifaddresses(interface)
-		domain = str(interface)+" @ "+socket.getfqdn()
+		interface = str(interface)
 		if(netifaces.AF_INET in ifaddrs):
 			for ineta in ifaddrs[netifaces.AF_INET]:
 				if(ineta["addr"] == "127.0.0.1"): continue
@@ -63,11 +63,11 @@ def getNics():
 				netmask = ineta["netmask"]
 				broadcast = ineta["broadcast"]
 				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
-					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "domain":domain})
+					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "interface":interface})
 				else:
 					for ether in ifaddrs[netifaces.AF_LINK]:
 						mentionedMacs.append(ether["addr"])
-						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "domain":domain})
+						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "interface":interface})
 		if(netifaces.AF_INET6 in ifaddrs):
 			for ineta in ifaddrs[netifaces.AF_INET6]:
 				if(ineta["addr"] == "::1"): continue
@@ -76,17 +76,17 @@ def getNics():
 				netmask = ineta["netmask"] if "netmask" in ineta else "-"
 				broadcast = ineta["broadcast"] if "broadcast" in ineta else "-"
 				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
-					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "domain":domain})
+					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "interface":interface})
 				else:
 					for ether in ifaddrs[netifaces.AF_LINK]:
 						mentionedMacs.append(ether["addr"])
-						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "domain":domain})
+						nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":ether["addr"], "interface":interface})
 		if(netifaces.AF_LINK in ifaddrs):
 			for ether in ifaddrs[netifaces.AF_LINK]:
 				if(ether["addr"].strip() == ""): continue
 				if(ether["addr"].startswith("00:00:00:00:00:00")): continue
 				if(not ether["addr"] in mentionedMacs):
-					nics.append({"addr":"-", "netmask":"-", "broadcast":"-", "mac":ether["addr"], "domain":domain})
+					nics.append({"addr":"-", "netmask":"-", "broadcast":"-", "mac":ether["addr"], "interface":interface})
 	return nics
 
 def getOs():
@@ -759,6 +759,7 @@ def mainloop():
 				'bios_version': getBiosVersion(),
 				'boot_type': getUefiOrBios(),
 				'secure_boot': getSecureBootEnabled(),
+				'domain': socket.getfqdn(),
 				'networks': getNics(),
 				'screens': getScreens(),
 				'printers': getPrinters(),
