@@ -34,7 +34,7 @@ import pyedid
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.9.2"
+AGENT_VERSION = "0.9.3"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -778,7 +778,11 @@ def mainloop():
 
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
+			ignoreContainerIds = []
 			for job in responseJson['result']['params']['software-jobs']:
+				if('container-id' in job and job['container-id'] in ignoreContainerIds):
+					print(logtime()+'Skipping Software Job '+str(job['id'])+' because container id '+str(job['container-id'])+' should be ignored.')
+					continue
 				if(job['procedure'].strip() == ''):
 					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': '-'})
@@ -815,15 +819,17 @@ def mainloop():
 
 					# check server's update_deploy_status response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
-					if('sequence-mode' in job and job['sequence-mode'] == 1 and jobStatusRequest != None and jobStatusRequest.status_code == 200):
+					if('container-id' in job and 'sequence-mode' in job and job['sequence-mode'] == 1 and jobStatusRequest != None and jobStatusRequest.status_code == 200):
 						jobStatusResponseJson = jobStatusRequest.json()
 						jobSucceeded = True
 						try:
 							jobSucceeded = bool(jobStatusResponseJson['result']['params']['job-succeeded'])
 						except KeyError: pass
 						if(not jobSucceeded):
-							print(logtime()+'Skipping pending jobs because server told me that the current job failed and sequence mode is set to 1.')
-							break
+							print(logtime()+'Add container id '+str(job['container-id'])+' to ignore array because server told me that the current job failed and sequence mode is set to 1.')
+							ignoreContainerIds.append(job['container-id'])
+							os.chdir(tempfile.gettempdir())
+							continue
 
 					# cleanup
 					os.chdir(tempfile.gettempdir())
