@@ -60,8 +60,8 @@ def getNics():
 			for ineta in ifaddrs[netifaces.AF_INET]:
 				if(ineta["addr"] == "127.0.0.1"): continue
 				addr = ineta["addr"]
-				netmask = ineta["netmask"]
-				broadcast = ineta["broadcast"]
+				netmask = ineta["netmask"] if "netmask" in ineta else "-"
+				broadcast = ineta["broadcast"] if "broadcast" in ineta else "-"
 				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
 					nics.append({"addr":addr, "netmask":netmask, "broadcast":broadcast, "mac":"-", "interface":interface})
 				else:
