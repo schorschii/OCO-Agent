@@ -34,7 +34,7 @@ import pyedid
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.9.1"
+AGENT_VERSION = "0.9.2"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -653,6 +653,13 @@ def jsonRequest(method, data):
 def logtime():
 	return "["+str(datetime.datetime.now())+"] "
 
+def guessEncodingAndDecode(textBytes, codecs=['utf-8', 'cp1252', 'cp850']):
+	for codec in codecs:
+		try:
+			return textBytes.decode(codec)
+		except UnicodeDecodeError: pass
+	return textBytes.decode(sys.stdout.encoding, 'replace') # fallback: replace invalid characters
+
 # function for checking if agent is already running (e.g. due to long running software jobs)
 def lockCheck():
 	try:
@@ -803,8 +810,8 @@ def mainloop():
 					# change to tmp dir and execute procedure
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
 					os.chdir(tempPath)
-					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-					jobStatusRequest = jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': res.stdout})
+					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+					jobStatusRequest = jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': guessEncodingAndDecode(res.stdout)})
 
 					# check server's update_deploy_status response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
