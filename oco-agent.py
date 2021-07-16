@@ -804,7 +804,20 @@ def mainloop():
 					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
 					os.chdir(tempPath)
 					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': res.stdout})
+					jobStatusRequest = jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': res.stdout})
+
+					# check server's update_deploy_status response
+					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
+					#print(job)
+					if('sequence-mode' in job and job['sequence-mode'] == 1 and jobStatusRequest != None and jobStatusRequest.status_code == 200):
+						jobStatusResponseJson = jobStatusRequest.json()
+						jobSucceeded = True
+						try:
+							jobSucceeded = bool(jobStatusResponseJson['result']['params']['job-succeeded'])
+						except KeyError: pass
+						if(not jobSucceeded):
+							print(logtime()+'Skipping pending jobs because server told me that the current job failed and sequence mode is set to 1.')
+							break
 
 					# cleanup
 					os.chdir(tempfile.gettempdir())
