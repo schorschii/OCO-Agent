@@ -808,7 +808,6 @@ def mainloop():
 
 					# check server's update_deploy_status response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
-					#print(job)
 					if('sequence-mode' in job and job['sequence-mode'] == 1 and jobStatusRequest != None and jobStatusRequest.status_code == 200):
 						jobStatusResponseJson = jobStatusRequest.json()
 						jobSucceeded = True
