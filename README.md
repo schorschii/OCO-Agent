@@ -4,10 +4,28 @@
 The Open Computer Orchestration (OCO) project enables IT administrators to centrally manage Linux, macOS and Windows machines using a comfortable web interface. Additionally, it provides software deployment features and a user logon overview.
 
 - [OCO Server](https://github.com/schorschii/oco-server)
+- [OCO Server Extensions](https://github.com/schorschii/oco-server-extensions)
 - [OCO Agent](https://github.com/schorschii/oco-agent)
 
 ## About OCO Agent
 The OCO agent needs to be installed on every client which should be managed with the OCO server. It periodically contacts the server to sync the inventory data and execute pending software jobs. This means that no additional port has to be opened - the client initiates the connection to the server. The agent can manage Linux, Windows and macOS machines.
+
+## System Requirements
+### Agent
+- 🐧 official supported Linux systems (`.deb` package provided)
+  - Ubuntu 18.04, 20.04 and 21.04
+  - derived distros like Linux Mint 19, 20 etc.
+- 🐧 other Linux Systems will most likely work as well but may require manual agent and dependency installation
+- 🍏 macOS 10.15 and 10.16 (`.pkg` package provided)
+- 🪟 Windows 7, 8(.1), 10 and 11 (`.exe` setup provided)
+  <details>
+  <summary>Windows 11 hint</summary>
+  
+  Windows 11 Build 22000 (the first official release build) is internally still named "Windows 10" (tested with the "Education" edition). The OCO agent will work but shows "Windows 10" as operating system. This is not an agent but a Windows issue, because the registry key `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProductName` is not updated to "Windows 11". Please use the build number to identify Windows 11 machines in the OCO web console. BTW: great job, Microsoft!
+  </details>
+
+### Server / Client
+- please refer to [OCO Server](https://github.com/schorschii/oco-server)
 
 ## Package Installation
 1. Please download and install the appropriate installation package for your operating system from the [latest release](https://github.com/schorschii/oco-agent/releases) on GitHub.
