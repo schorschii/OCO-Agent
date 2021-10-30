@@ -34,7 +34,7 @@ import pyedid
 from zipfile import ZipFile
 
 
-AGENT_VERSION = "0.9.4"
+AGENT_VERSION = "0.10.0"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -127,6 +127,9 @@ def getOsVersion():
 		return distro.version()
 	elif "darwin" in OS_TYPE:
 		return platform.mac_ver()[0]
+
+def getUptime():
+	return time.time() - psutil.boot_time()
 
 def getKernelVersion():
 	if "win32" in OS_TYPE:
@@ -764,6 +767,7 @@ def mainloop():
 				'manufacturer': getMachineManufacturer(),
 				'model': getMachineModel(),
 				'bios_version': getBiosVersion(),
+				'uptime': getUptime(),
 				'boot_type': getUefiOrBios(),
 				'secure_boot': getSecureBootEnabled(),
 				'domain': socket.getfqdn(),
