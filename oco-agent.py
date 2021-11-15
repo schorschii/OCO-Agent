@@ -47,7 +47,7 @@ if "win32" in OS_TYPE: import wmi, winreg
 def getHostname():
 	hostname = socket.gethostname()
 	if "darwin" in OS_TYPE:
-		if(hostname.endswith('.local')): hostname = hostname[:-6]
+		if('.' in hostname): hostname = hostname.split('.', 1)[0]
 	return hostname
 
 def getNics():
