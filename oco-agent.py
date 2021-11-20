@@ -853,7 +853,7 @@ def mainloop():
 					# execute shutdown if requested
 					if('shutdown' in job and job['shutdown'] != None and isinstance(job['shutdown'], int) and job['shutdown'] >= 0):
 						timeout = 0
-						if(isUserLoggedIn()): timeout = int(job['restart'])
+						if(isUserLoggedIn()): timeout = int(job['shutdown'])
 						if "win32" in OS_TYPE:
 							res = subprocess.run('shutdown -s -t '+str(timeout*60), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
 							if(res.returncode == 0): restartFlag = True
