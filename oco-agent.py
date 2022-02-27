@@ -722,7 +722,7 @@ def mainloop():
 		"agent_version": AGENT_VERSION,
 		"networks": getNics(),
 	}
-	request = jsonRequest("oco.agent_hello", data)
+	request = jsonRequest("oco.agent.hello", data)
 
 	# check response
 	if(request != None and request.status_code == 200):
@@ -778,7 +778,7 @@ def mainloop():
 				'software': getInstalledSoftware(),
 				'logins': getLogins()
 			}
-			request = jsonRequest('oco.agent_update', data)
+			request = jsonRequest('oco.agent.update', data)
 
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
@@ -789,7 +789,7 @@ def mainloop():
 					continue
 				if(job['procedure'].strip() == ''):
 					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': '-'})
+					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': '-'})
 					continue
 				if(restartFlag == True):
 					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
@@ -806,7 +806,7 @@ def mainloop():
 
 					# download if needed
 					if(job['download'] == True):
-						jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
+						jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
 						socket.setdefaulttimeout(connectionTimeout)
 						payloadparams = { 'hostname' : getHostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
@@ -816,10 +816,10 @@ def mainloop():
 							zipObj.extractall(tempPath)
 
 					# change to tmp dir and execute procedure
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
+					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
 					os.chdir(tempPath)
 					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-					jobStatusRequest = jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': guessEncodingAndDecode(res.stdout)})
+					jobStatusRequest = jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': guessEncodingAndDecode(res.stdout)})
 
 					# check server's update_deploy_status response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
@@ -868,7 +868,7 @@ def mainloop():
 
 				except Exception as e:
 					print(logtime()+str(e))
-					jsonRequest('oco.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
+					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
 					os.chdir(tempfile.gettempdir())
 
 
