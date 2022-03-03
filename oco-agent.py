@@ -789,7 +789,7 @@ def mainloop():
 					continue
 				if(job['procedure'].strip() == ''):
 					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
-					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': '-'})
+					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': ''})
 					continue
 				if(restartFlag == True):
 					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
