@@ -16,7 +16,7 @@ The OCO agent needs to be installed on every client which should be managed with
   - Ubuntu 18.04, 20.04 and 21.04
   - derived distros like Linux Mint 19, 20 etc.
 - 🐧 other Linux Systems will most likely work as well but may require manual agent and dependency installation
-- 🍏 macOS 10.15 and 10.16 (`.pkg` package provided)
+- 🍏 macOS 10.15, 11 and 12 (`.pkg` package provided)
 - 🪟 Windows 7, 8(.1), 10 and 11 (`.exe` setup provided)
   <details>
   <summary>Windows 11 hint</summary>
@@ -24,12 +24,20 @@ The OCO agent needs to be installed on every client which should be managed with
   Windows 11 Build 22000 (the first official release build) is internally still named "Windows 10" (tested with the "Education" edition). The OCO agent will work but shows "Windows 10" as operating system. This is not an agent but a Windows issue, because the registry key `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProductName` is not updated to "Windows 11". Please use the build number to identify Windows 11 machines in the OCO web console. BTW: great job, Microsoft!
   </details>
 
-### Server / Client
+### Server / (Admin) Client
 - please refer to [OCO Server](https://github.com/schorschii/oco-server)
 
 ## Package Installation
 1. Please download and install the appropriate installation package for your operating system from the [latest release](https://github.com/schorschii/oco-agent/releases) on GitHub.
 2. Adjust the config file (.ini) in the installation directory (respectively `/etc`) to point to your OCO server and set the correct agent key (defined on the server's web frontend). Restart the service.
+
+## Agent Setup
+There are two ways to configure the agent:
+1. (recommended) Create a SRV record in your DNS. The agent will query this value on the first startup and save it in its config file.
+2. Set the URL to `api-agent.php` and `payload-provider.php` manually in the agent config file `oco-agent.ini` (can be found in the installation directory on Windows or under `/etc` on Linux).
+
+## Debugging
+In case of problems, you can debug the agent by manually executing the script in terminal as root/Administrator, so you can check its output.
 
 ## Integration in your OS installation
 You can use known techniques to integrate the agent into your "golden master" OS image, e.g.:
@@ -42,14 +50,10 @@ This is how you manually install the agent.
 
 Please do not forget to adjust the config file (.ini) to point to your OCO server and set the correct agent key (defined on the server's web frontend). Set appropriate permissions to only allow root/Administrator to read the file content in order to protect the agent key.
 
-In case of problems, you can debug the agent by manually executing the script in terminal as root/Administrator, so you can check its output.
-
-**Hint:** You can create your own agent package which already contains the correct agent key and server address for your environment using methods described [here](https://github.com/schorschii/oco-server/blob/master/docs/Packages.md). I'm also offering the service to produce such specialized packages. Please [contact me](https://georg-sieber.de/?page=impressum) if you're interested.
-
 ### Linux (Systemd)
 No compilation needed, just install all dependencies and oco-agent.service file for systemd.
 ```
-apt install python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip python3-dateutil mokutil
+apt install python3-dnspython python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip python3-dateutil mokutil
 sudo -H pip3 install utmp pyedid
 
 # move oco-agent.py to /usr/bin and make it executable
@@ -62,7 +66,7 @@ systemctl start oco-agent
 
 ### macOS
 ```
-pip install pyedid
+pip install dnspython pyedid
 
 pyinstaller -F oco-agent.py
 
@@ -76,7 +80,7 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 
 ### Windows
 ```
-pip install pip install requests netifaces urllib3 psutil distro python-dateutil pyedid
+pip install dnspython requests netifaces urllib3 psutil distro python-dateutil pyedid
 pip install wmi pywin32 winevt  # Windows specific modules
 
 # since of April 2021, winevt has two bugs which prevents oco-agent from successfully parsing windows logins

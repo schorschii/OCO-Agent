@@ -32,6 +32,7 @@ import subprocess
 import shlex
 import pyedid
 from zipfile import ZipFile
+from dns import resolver, rdatatype
 
 
 AGENT_VERSION = "0.10.0"
@@ -899,6 +900,22 @@ try:
 	if(configParser.has_option("server", "server-key")):
 		serverKey = configParser.get("server", "server-key")
 	restartFlag = False
+
+	# try auto discovery
+	if(apiUrl.strip() == ""):
+		print(logtime()+"Server API URL is empty - trying DNS auto discovery ...")
+		try:
+			res = resolver.query(qname=f"_oco._tcp.sieber.systems", rdtype=rdatatype.SRV, lifetime=10)
+			for srv in res.rrset:
+				apiUrl = "https://"+str(srv.target)+":"+str(srv.port)+"/api-agent.php"
+				payloadUrl = "https://"+str(srv.target)+":"+str(srv.port)+"/payloadprovider.php"
+				print(logtime()+'DNS auto discovery found server: '+apiUrl)
+				configParser.set("server", "api-url", apiUrl)
+				configParser.set("server", "payload-url", payloadUrl)
+				with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
+				break
+		except Exception as e: print(logtime()+'DNS auto discovery failed: '+str(e))
+
 except Exception as e:
 	print(logtime()+str(e))
 	sys.exit(1)
