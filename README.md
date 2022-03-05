@@ -33,7 +33,7 @@ The OCO agent needs to be installed on every client which should be managed with
 
 ## Agent Setup
 There are two ways to configure the agent:
-1. (recommended) Create a SRV record in your DNS. The agent will query this value on the first startup and save it in its config file.
+1. (recommended) Create a SRV record `_oco._tcp.yourdomain.tld` in your DNS. The agent will query this value on the first startup and save the server name in its config file.
 2. Set the URL to `api-agent.php` and `payload-provider.php` manually in the agent config file `oco-agent.ini` (can be found in the installation directory on Windows or under `/etc` on Linux).
 
 ## Debugging
