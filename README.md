@@ -54,7 +54,8 @@ Please do not forget to adjust the config file (.ini) to point to your OCO serve
 No compilation needed, just install all dependencies and oco-agent.service file for systemd.
 ```
 apt install python3-dnspython python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip python3-dateutil mokutil
-sudo -H pip3 install utmp pyedid
+sudo -H pip3 install pyedid  # pyedid is not available in Ubuntu/Debian repos
+sudo -H pip3 install utmp  # Linux specific modules
 
 # move oco-agent.py to /usr/bin and make it executable
 # move oco-agent.ini to /etc
@@ -66,7 +67,7 @@ systemctl start oco-agent
 
 ### macOS
 ```
-pip install dnspython pyedid
+pip install dnspython requests netifaces urllib3 psutil distro python-dateutil pyedid
 
 pyinstaller -F oco-agent.py
 
