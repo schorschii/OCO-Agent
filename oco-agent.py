@@ -17,7 +17,6 @@ import socket
 import netifaces
 import platform
 import os, sys, stat
-import urllib
 import configparser
 import argparse
 import psutil
@@ -622,6 +621,13 @@ def removeAll(path):
 			os.rmdir(os.path.join(root, name))
 	os.rmdir(path)
 
+def downloadFile(url, params, path):
+	with requests.get(url, params=params, stream=True, timeout=connectionTimeout) as r:
+		r.raise_for_status()
+		with open(path, 'wb') as f:
+			for chunk in r.iter_content(chunk_size=8192): 
+				f.write(chunk)
+
 def jsonRequest(method, data):
 	# compile request header and payload
 	headers = {"content-type": "application/json"}
@@ -809,9 +815,8 @@ def mainloop():
 					if(job['download'] == True):
 						jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
-						socket.setdefaulttimeout(connectionTimeout)
 						payloadparams = { 'hostname' : getHostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
-						urllib.request.urlretrieve(payloadUrl+'?'+urllib.parse.urlencode(payloadparams), tempZipPath)
+						downloadFile(payloadUrl, payloadparams, tempZipPath)
 
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							zipObj.extractall(tempPath)

@@ -53,7 +53,7 @@ Please do not forget to adjust the config file (.ini) to point to your OCO serve
 ### Linux (Systemd)
 No compilation needed, just install all dependencies and oco-agent.service file for systemd.
 ```
-apt install python3-dnspython python3-requests python3-netifaces python3-urllib3 python3-psutil python3-distro python3-pip python3-dateutil mokutil
+apt install python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil mokutil
 sudo -H pip3 install pyedid  # pyedid is not available in Ubuntu/Debian repos
 sudo -H pip3 install utmp  # Linux specific modules
 
@@ -67,7 +67,7 @@ systemctl start oco-agent
 
 ### macOS
 ```
-pip install dnspython requests netifaces urllib3 psutil distro python-dateutil pyedid
+pip install dnspython requests netifaces psutil distro python-dateutil pyedid
 
 pyinstaller -F oco-agent.py
 
@@ -81,7 +81,7 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 
 ### Windows
 ```
-pip install dnspython requests netifaces urllib3 psutil distro python-dateutil pyedid
+pip install dnspython requests netifaces psutil distro python-dateutil pyedid
 pip install wmi pywin32 winevt  # Windows specific modules
 
 # since of April 2021, winevt has two bugs which prevents oco-agent from successfully parsing windows logins
