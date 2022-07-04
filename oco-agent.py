@@ -263,7 +263,9 @@ def getInstalledSoftware():
 		for app in os.listdir(appdir):
 			appname = os.fsdecode(app)
 			if(not os.path.isfile(appname) and appname.endswith(".app")):
-				with open(os.path.join(appdirname, appname, "Contents", "Info.plist"), "rb") as f:
+				infoPlstPath = os.path.join(appdirname, appname, "Contents", "Info.plist")
+				if(not os.path.isfile(infoPlstPath)): continue
+				with open(infoPlstPath, "rb") as f:
 					plist_data = plistlib.load(f)
 					software.append({
 						"name": plist_data.get("CFBundleName") or appname,
