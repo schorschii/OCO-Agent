@@ -34,6 +34,8 @@ from zipfile import ZipFile
 from dns import resolver, rdatatype
 
 
+##### CONSTANTS #####
+
 AGENT_VERSION = "0.13.8"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
@@ -42,7 +44,26 @@ OS_TYPE = sys.platform.lower()
 if "win32" in OS_TYPE: import wmi, winreg
 
 
-##### FUNCTIONS #####
+##### GLOBAL VARIABLES #####
+
+restartFlag = False
+config = {
+	"debug": False,
+	"connection-timeout": 12,
+	"query-interval": 60,
+	"agent-key": "",
+	"api-url": "",
+	"payload-url": "",
+	"server-key": "",
+	"linux": {},
+	"macos": {},
+	"windows": {
+		"username-with-domain": False
+	}
+}
+
+
+##### INVENTORY FUNCTIONS #####
 
 def getHostname():
 	hostname = socket.gethostname()
@@ -532,9 +553,26 @@ def getPartitions():
 			})
 	return partitions
 
+def queryRegistryUserDisplayName(querySid):
+	# get user fullname from SessionData cache in registry
+	key = "SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI\SessionData"
+	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
+	try:
+		count = 0
+		while True:
+			name = winreg.EnumKey(reg, count)
+			count = count + 1
+			reg2 = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key+"\\"+name, 0, winreg.KEY_READ)
+			sid, regtype = winreg.QueryValueEx(reg2, "LoggedOnUserSID")
+			if querySid == sid:
+				displayName, regtype = winreg.QueryValueEx(reg2, "LoggedOnDisplayName")
+				return displayName
+	except WindowsError as e: pass
+	return ""
 def getLogins():
 	users = []
 	if "win32" in OS_TYPE:
+		# if necessary in the future, the user GUID can be queried from: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\<SID> -> "Guid"
 		# Logon Types
 		#  2: Interactive (local console)
 		#  3: Network (access to network shares and printers)
@@ -565,7 +603,8 @@ def getLogins():
 					# example timestamp: 2021-04-09T13:47:14.719737700Z
 					dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
 					users.append({
-						"username": event["TargetUserName"],
+						"display_name": queryRegistryUserDisplayName(event["TargetUserSid"]),
+						"username": event["TargetDomainName"]+"\\"+event["TargetUserName"] if config["windows"]["username-with-domain"] else event["TargetUserName"],
 						"console": event["IpAddress"],
 						"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
 					})
@@ -579,6 +618,7 @@ def getLogins():
 				if(str(entry.type) == "UTmpRecordType.user_process"):
 					dateObject = datetime.datetime.utcfromtimestamp(entry.sec)
 					users.append({
+						"display_name": os.popen("getent passwd "+shlex.quote(entry.user)+" | cut -d : -f 5").read().strip().rstrip(","),
 						"username": entry.user,
 						"console": entry.line,
 						"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
@@ -594,11 +634,56 @@ def getLogins():
 				dateObject = dateObject.replace(tzinfo=tz.tzlocal()) # UTC time
 				if(dateObject.year == 1900): dateObject = dateObject.replace(year=datetime.date.today().year)
 				users.append({
+					"display_name": os.popen("id -F "+shlex.quote(parts[0])).read().strip(),
 					"username": parts[0],
 					"console": parts[1],
 					"timestamp": dateObject.astimezone(tz.tzutc()).strftime("%Y-%m-%d %H:%M:%S")
 				})
 	return users
+
+
+##### AGENT-SERVER COMMUNICATION FUNCTIONS #####
+
+def downloadFile(url, params, path):
+	with requests.get(url, params=params, stream=True, timeout=config["connection-timeout"]) as r:
+		r.raise_for_status()
+		with open(path, 'wb') as f:
+			for chunk in r.iter_content(chunk_size=8192): 
+				f.write(chunk)
+
+def jsonRequest(method, data):
+	headers = {"content-type": "application/json"}
+	data = {
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": method,
+		"params": {
+			"hostname": getHostname(),
+			"agent-key": config["agent-key"],
+			"data": data
+		}
+	}
+	data_json = json.dumps(data)
+
+	try:
+		# send request
+		if(config["debug"]): print(logtime()+"< " + data_json)
+		response = requests.post(config["api-url"], data=data_json, headers=headers, timeout=config["connection-timeout"])
+
+		# print response
+		if(config["debug"]): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
+		if(response.status_code != 200):
+			print(logtime()+"Request failed with HTTP status code " + str(response.status_code))
+
+		# return response
+		return response
+
+	except Exception as e:
+		print(logtime()+str(e))
+		return None
+
+
+##### VARIOUS AGENT FUNCTIONS #####
 
 def isUserLoggedIn():
 	if "win32" in OS_TYPE:
@@ -622,45 +707,6 @@ def removeAll(path):
 		for name in dirs:
 			os.rmdir(os.path.join(root, name))
 	os.rmdir(path)
-
-def downloadFile(url, params, path):
-	with requests.get(url, params=params, stream=True, timeout=connectionTimeout) as r:
-		r.raise_for_status()
-		with open(path, 'wb') as f:
-			for chunk in r.iter_content(chunk_size=8192): 
-				f.write(chunk)
-
-def jsonRequest(method, data):
-	# compile request header and payload
-	headers = {"content-type": "application/json"}
-	data = {
-		"jsonrpc": "2.0",
-		"id": 1,
-		"method": method,
-		"params": {
-			"hostname": getHostname(),
-			"agent-key": apiKey,
-			"data": data
-		}
-	}
-	data_json = json.dumps(data)
-
-	try:
-		# send request
-		if(DEBUG): print(logtime()+"< " + data_json)
-		response = requests.post(apiUrl, data=data_json, headers=headers, timeout=connectionTimeout)
-
-		# print response
-		if(DEBUG): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
-		if(response.status_code != 200):
-			print(logtime()+"Request failed with HTTP status code " + str(response.status_code))
-
-		# return response
-		return response
-
-	except Exception as e:
-		print(logtime()+str(e))
-		return None
 
 def logtime():
 	return "["+str(datetime.datetime.now())+"] "
@@ -712,13 +758,15 @@ def lockClean(lockfile):
 	os.unlink(LOCKFILE_PATH)
 	print(logtime()+"Closing lock file and exiting.")
 
-# the daemon function - calls mainloop() in endless loop
+
+##### AGENT MAIN LOOP #####
+
 def daemon():
 	while(True):
 		try: mainloop()
 		except KeyError as e: print(logtime()+"KeyError: "+str(e))
-		print(logtime()+"Running in daemon mode. Waiting "+str(queryInterval)+" seconds to send next request.")
-		time.sleep(queryInterval)
+		print(logtime()+"Running in daemon mode. Waiting "+str(config["query-interval"])+" seconds to send next request.")
+		time.sleep(config["query-interval"])
 
 # the main server communication function
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
@@ -738,15 +786,14 @@ def mainloop():
 		responseJson = request.json()
 
 		# save server key if server key is not already set in local config
-		global serverKey
-		if(serverKey == None or serverKey == ""):
+		if(config["server-key"] == None or config["server-key"] == ""):
 			print(logtime()+"Write new config with updated server key...")
 			configParser.set("server", "server-key", responseJson["result"]["params"]["server-key"])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
-			serverKey = configParser.get("server", "server-key")
+			config["server-key"] = configParser.get("server", "server-key")
 
 		# check server key
-		if(serverKey != responseJson["result"]["params"]["server-key"]):
+		if(config["server-key"] != responseJson["result"]["params"]["server-key"]):
 			print(logtime()+"!!! Invalid server key, abort.")
 			return
 
@@ -755,8 +802,7 @@ def mainloop():
 			print(logtime()+"Write new config with updated agent key...")
 			configParser.set("agent", "agent-key", responseJson["result"]["params"]["agent-key"])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
-			global apiKey
-			apiKey = configParser.get("agent", "agent-key")
+			config["agent-key"] = configParser.get("agent", "agent-key")
 
 		# send computer info if requested
 		if(responseJson["result"]["params"]["update"] == 1):
@@ -817,8 +863,8 @@ def mainloop():
 					if(job['download'] == True):
 						jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
-						payloadparams = { 'hostname' : getHostname(), 'agent-key' : apiKey, 'id' : job['package-id'] }
-						downloadFile(payloadUrl, payloadparams, tempZipPath)
+						payloadparams = { 'hostname' : getHostname(), 'agent-key' : config['agent-key'], 'id' : job['package-id'] }
+						downloadFile(config['payload-url'], payloadparams, tempZipPath)
 
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							zipObj.extractall(tempPath)
@@ -880,7 +926,7 @@ def mainloop():
 					os.chdir(tempfile.gettempdir())
 
 
-##### MAIN #####
+##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 
 try:
 	# read arguments
@@ -895,30 +941,26 @@ try:
 	# read config
 	configParser = configparser.RawConfigParser()
 	configParser.read(configFilePath)
-	DEBUG = (int(configParser.get("agent", "debug")) == 1)
-	connectionTimeout = 12
-	if(configParser.has_option("agent", "connection-timeout")):
-		connectionTimeout = int(configParser.get("agent", "connection-timeout"))
-	queryInterval = int(configParser.get("agent", "query-interval"))
-	apiKey = configParser.get("agent", "agent-key")
-	apiUrl = configParser.get("server", "api-url")
-	payloadUrl = configParser.get("server", "payload-url")
-	serverKey = ""
-	if(configParser.has_option("server", "server-key")):
-		serverKey = configParser.get("server", "server-key")
-	restartFlag = False
+	if(configParser.has_option("agent", "debug")): config["debug"] = (int(configParser.get("agent", "debug")) == 1)
+	if(configParser.has_option("agent", "connection-timeout")): config["connection-timeout"] = int(configParser.get("agent", "connection-timeout"))
+	if(configParser.has_option("agent", "query-interval")): config["query-interval"] = int(configParser.get("agent", "query-interval"))
+	if(configParser.has_option("agent", "agent-key")): config["agent-key"] = configParser.get("agent", "agent-key")
+	if(configParser.has_option("server", "api-url")): config["api-url"] = configParser.get("server", "api-url")
+	if(configParser.has_option("server", "payload-url")): config["payload-url"] = configParser.get("server", "payload-url")
+	if(configParser.has_option("server", "server-key")): config["server-key"] = configParser.get("server", "server-key")
+	if(configParser.has_option("windows", "username-with-domain")): config["windows"]["username-with-domain"] = (int(configParser.get("windows", "username-with-domain")) == 1)
 
-	# try auto discovery
-	if(apiUrl.strip() == ""):
+	# try server auto discovery
+	if(config["api-url"].strip() == ""):
 		print(logtime()+"Server API URL is empty - trying DNS auto discovery ...")
 		try:
 			res = resolver.query(qname=f"_oco._tcp.sieber.systems", rdtype=rdatatype.SRV, lifetime=10)
 			for srv in res.rrset:
-				apiUrl = "https://"+str(srv.target)+":"+str(srv.port)+"/api-agent.php"
-				payloadUrl = "https://"+str(srv.target)+":"+str(srv.port)+"/payloadprovider.php"
-				print(logtime()+'DNS auto discovery found server: '+apiUrl)
-				configParser.set("server", "api-url", apiUrl)
-				configParser.set("server", "payload-url", payloadUrl)
+				config["api-url"] = "https://"+str(srv.target)+":"+str(srv.port)+"/api-agent.php"
+				config["payload-url"] = "https://"+str(srv.target)+":"+str(srv.port)+"/payloadprovider.php"
+				print(logtime()+'DNS auto discovery found server: '+config["api-url"])
+				configParser.set("server", "api-url", config["api-url"])
+				configParser.set("server", "payload-url", config["payload-url"])
 				with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
 				break
 		except Exception as e: print(logtime()+'DNS auto discovery failed: '+str(e))
