@@ -671,7 +671,7 @@ def jsonRequest(method, data):
 		response = requests.post(config["api-url"], data=data_json, headers=headers, timeout=config["connection-timeout"])
 
 		# print response
-		if(config["debug"]): print(logtime()+"> [" + str(response.status_code) + "] " + response.text)
+		if(config["debug"]): print(logtime()+"> (" + str(response.elapsed.total_seconds()) + "s) [" + str(response.status_code) + "] " + response.text)
 		if(response.status_code != 200):
 			print(logtime()+"Request failed with HTTP status code " + str(response.status_code))
 
