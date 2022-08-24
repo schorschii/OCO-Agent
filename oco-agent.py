@@ -53,7 +53,6 @@ config = {
 	"query-interval": 60,
 	"agent-key": "",
 	"api-url": "",
-	"payload-url": "",
 	"server-key": "",
 	"linux": {},
 	"macos": {},
@@ -864,7 +863,7 @@ def mainloop():
 						jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
 						payloadparams = { 'hostname' : getHostname(), 'agent-key' : config['agent-key'], 'id' : job['package-id'] }
-						downloadFile(config['payload-url'], payloadparams, tempZipPath)
+						downloadFile(config['api-url'], payloadparams, tempZipPath)
 
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							zipObj.extractall(tempPath)
@@ -946,7 +945,6 @@ try:
 	if(configParser.has_option("agent", "query-interval")): config["query-interval"] = int(configParser.get("agent", "query-interval"))
 	if(configParser.has_option("agent", "agent-key")): config["agent-key"] = configParser.get("agent", "agent-key")
 	if(configParser.has_option("server", "api-url")): config["api-url"] = configParser.get("server", "api-url")
-	if(configParser.has_option("server", "payload-url")): config["payload-url"] = configParser.get("server", "payload-url")
 	if(configParser.has_option("server", "server-key")): config["server-key"] = configParser.get("server", "server-key")
 	if(configParser.has_option("windows", "username-with-domain")): config["windows"]["username-with-domain"] = (int(configParser.get("windows", "username-with-domain")) == 1)
 
@@ -957,10 +955,8 @@ try:
 			res = resolver.query(qname=f"_oco._tcp.sieber.systems", rdtype=rdatatype.SRV, lifetime=10)
 			for srv in res.rrset:
 				config["api-url"] = "https://"+str(srv.target)+":"+str(srv.port)+"/api-agent.php"
-				config["payload-url"] = "https://"+str(srv.target)+":"+str(srv.port)+"/payloadprovider.php"
 				print(logtime()+'DNS auto discovery found server: '+config["api-url"])
 				configParser.set("server", "api-url", config["api-url"])
-				configParser.set("server", "payload-url", config["payload-url"])
 				with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
 				break
 		except Exception as e: print(logtime()+'DNS auto discovery failed: '+str(e))
