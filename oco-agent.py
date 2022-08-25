@@ -554,7 +554,7 @@ def getPartitions():
 
 def queryRegistryUserDisplayName(querySid):
 	# get user fullname from SessionData cache in registry
-	key = "SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI\SessionData"
+	key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Authentication\\LogonUI\\SessionData"
 	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
 	try:
 		count = 0
@@ -568,10 +568,19 @@ def queryRegistryUserDisplayName(querySid):
 				return displayName
 	except WindowsError as e: pass
 	return ""
+def queryRegistryUserGuid(querySid):
+	# get user GUID from ProfileList in registry
+	key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\"+querySid
+	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
+	try:
+		while True:
+			guid, regtype = winreg.QueryValueEx(reg, "Guid")
+			return guid.strip()
+	except WindowsError as e: pass
+	return None
 def getLogins():
 	users = []
 	if "win32" in OS_TYPE:
-		# if necessary in the future, the user GUID can be queried from: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\<SID> -> "Guid"
 		# Logon Types
 		#  2: Interactive (local console)
 		#  3: Network (access to network shares and printers)
@@ -602,6 +611,7 @@ def getLogins():
 					# example timestamp: 2021-04-09T13:47:14.719737700Z
 					dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
 					users.append({
+						"guid": queryRegistryUserGuid(event["TargetUserSid"]),
 						"display_name": queryRegistryUserDisplayName(event["TargetUserSid"]),
 						"username": event["TargetDomainName"]+"\\"+event["TargetUserName"] if config["windows"]["username-with-domain"] else event["TargetUserName"],
 						"console": event["IpAddress"],
