@@ -554,9 +554,9 @@ def getPartitions():
 
 def queryRegistryUserDisplayName(querySid):
 	# get user fullname from SessionData cache in registry
-	key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Authentication\\LogonUI\\SessionData"
-	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
 	try:
+		key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Authentication\\LogonUI\\SessionData"
+		reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
 		count = 0
 		while True:
 			name = winreg.EnumKey(reg, count)
@@ -570,12 +570,11 @@ def queryRegistryUserDisplayName(querySid):
 	return ""
 def queryRegistryUserGuid(querySid):
 	# get user GUID from ProfileList in registry
-	key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\"+querySid
-	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
 	try:
-		while True:
-			guid, regtype = winreg.QueryValueEx(reg, "Guid")
-			return guid.strip()
+		key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\"+querySid
+		reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
+		guid, regtype = winreg.QueryValueEx(reg, "Guid")
+		return guid.strip()
 	except WindowsError as e: pass
 	return None
 def getLogins():
