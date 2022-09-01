@@ -8,6 +8,7 @@
 #define MyAppSupportURL "https://sieber.systems/"
 #define MyAppDir "C:\Program Files\OCO Agent"
 #define AgentConfigFile MyAppDir+"\oco-agent.ini"
+#define AgentApiEndpoint "/api-agent.php"
 
 [Setup]
 AppId={{7427E511-277A-45DC-B017-805A7F2FAB0F}
@@ -107,6 +108,8 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ServerName: string;
 begin
   { agent update: stop and remove old service }
   //if (CurStep = ssInstall) and FileExists(ExpandConstant('{app}\service-wrapper.exe')) then
@@ -143,7 +146,11 @@ begin
     WizardForm.StatusLabel.Caption := 'Writing agent config file...'
     if not (CustomQueryPage = nil) then
     begin
-      FileReplaceString(ExpandConstant('{#AgentConfigFile}'), 'SERVERNAME', CustomQueryPage.Values[0]);
+      if CustomQueryPage.Values[0] <> '' then
+      begin
+        ServerName := 'https://'+CustomQueryPage.Values[0]+'{#AgentApiEndpoint}'
+      end;
+      FileReplaceString(ExpandConstant('{#AgentConfigFile}'), 'SERVERURL', ServerName);
       FileReplaceString(ExpandConstant('{#AgentConfigFile}'), 'AGENTKEY', CustomQueryPage.Values[1]);
     end;
 
