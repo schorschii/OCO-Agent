@@ -35,7 +35,9 @@ The OCO agent needs to be installed on every client which should be managed with
 
 ## Agent Setup
 ### Via Installer
-For an automated installation, it is necessary to hand over the OCO server name and agent key to the setup. This can be done as follows.
+The installer will ask you for all necessary configuration values during the setup. If you fill out the fields correctly, no more configuration is required.
+
+For a fully automated installation, it is necessary to hand over the OCO server name and agent key to the setup. This can be done as follows.
 
 - **Debian/Ubuntu Linux**
   Preseed the debconf values for the debian package:
