@@ -91,7 +91,7 @@ begin
       wpLicense,
       'Agent Configuration',
       'Please enter your OCO server details',
-      'You can change these values later by directly editing the config "oco-agent.ini"'
+      'You can change these values later by directly editing the config file "oco-agent.ini"'
     );
     CustomQueryPage.Add('DNS name (FQDN) of your OCO server: ', False);
     CustomQueryPage.Add('Agent key to authenticate against your OCO server: ', False);
