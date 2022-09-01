@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=/usr/bin/python3 /usr/bin/oco-agent.py --daemon --config /etc/oco-agent.ini
+ExecStart=/usr/bin/python3 /usr/bin/oco-agent --daemon --config /etc/oco-agent.ini
 
 [Install]
 WantedBy=multi-user.target
