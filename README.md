@@ -31,7 +31,7 @@ The OCO agent needs to be installed on every client which should be managed with
 
 ## Package Installation
 1. Please download and install the appropriate installation package for your operating system from the [latest release](https://github.com/schorschii/oco-agent/releases) on GitHub.
-2. Adjust the config file (`.ini`) in the installation directory (respectively `/etc`) to point to your OCO server and set the correct agent key (defined on the server's configuration file). Restart the service.
+2. Configure your agent using one method described in the "Agent Setup" section.
 
 ## Agent Setup
 ### Via Installer
@@ -59,7 +59,7 @@ For an automated installation, it is necessary to hand over the OCO server name 
   Then, call the setup with the parameter `/LOADINF=oco-agent-setup.inf /SILENT`. Delete the `oco-agent-setup.inf` file after the agent installation to protect the agent key.
 
 ### Manually
-Set the URL to the server's `api-agent.php` manually in the agent config file `oco-agent.ini` (can be found in the installation directory on Windows or under `/etc` on Linux).
+Set the URL to the server's `api-agent.php` and set correct agent key (as defined on the server's config file) manually in the agent config file `oco-agent.ini`. The agent config file can be found in the installation directory on Windows or under `/etc` on Linux. After that, restart the service.
 
 **General Note:** If you leave the server name empty, the agent tries to query the SRV record `_oco._tcp.yourdomain.tld` on the first startup from your DNS. The agent will then use this value and save the server name in its config file.
 
