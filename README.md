@@ -31,7 +31,7 @@ The OCO agent needs to be installed on every client which should be managed with
 
 ## Package Installation
 1. Please download and install the appropriate installation package for your operating system from the [latest release](https://github.com/schorschii/oco-agent/releases) on GitHub.
-2. Adjust the config file (.ini) in the installation directory (respectively `/etc`) to point to your OCO server and set the correct agent key (defined on the server's configuration file). Restart the service.
+2. Adjust the config file (`.ini`) in the installation directory (respectively `/etc`) to point to your OCO server and set the correct agent key (defined on the server's configuration file). Restart the service.
 
 ## Agent Setup
 ### Via Installer
@@ -69,7 +69,7 @@ You can use known techniques to integrate the agent into your "golden master" OS
 ## Manual Installation
 This is how you manually install the agent.
 
-Please do not forget to adjust the config file (.ini) to point to your OCO server and set the correct agent key (defined on the server's web frontend). Set appropriate permissions to only allow root/Administrator to read the file content in order to protect the agent key.
+Please do not forget to adjust the config file to point to your OCO server and set the correct agent key (defined on the server's web frontend). Set appropriate permissions to only allow root/Administrator to read the file content in order to protect the agent key.
 
 ### Linux (Systemd)
 No compilation needed, just install all dependencies and oco-agent.service file for systemd.
