@@ -1,1 +1,5 @@
 oco-agent.ini
+__pycache__/
+build/
+dist/
+installer/Output
