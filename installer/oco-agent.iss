@@ -19,12 +19,15 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppSupportURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
+WizardImageFile="..\assets\installer-side-img.bmp"
+WizardSmallImageFile="..\assets\installer-top-img.bmp"
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon="{#MyAppDir}\oco-agent.exe,0"
 DefaultDirName={#MyAppDir}
 DisableDirPage=yes
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+DisableWelcomePage=no
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 OutputBaseFilename=oco-agent
@@ -34,7 +37,7 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "..\LICENSE.txt"
 ; Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Files]
@@ -85,7 +88,7 @@ begin
   if not FileExists('{#AgentConfigFile}') then
   begin
     CustomQueryPage := CreateInputQueryPage(  
-      wpWelcome,
+      wpLicense,
       'Agent Configuration',
       'Please enter your OCO server details',
       'You can change these values later by directly editing the config "oco-agent.ini"'
