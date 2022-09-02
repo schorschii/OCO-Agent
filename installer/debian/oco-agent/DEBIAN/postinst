@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Exit on error
+set -e
+
+# Source debconf library.
+. /usr/share/debconf/confmodule
+
+# install modules which are not available in the Debian/Ubuntu repos
+sudo -H pip3 install --upgrade utmp pyedid
+
+# ask and set settings
+# (use "echo PURGE | sudo debconf-communicate companion-linux" to reset)
+db_input high oco-agent/server-name || true
+db_go || true
+db_get oco-agent/server-name
+if [ "$RET" != "" ]; then
+	RET="https://$RET/api-agent.php"
+fi
+sed -i "s|SERVERURL|$RET|g" /etc/oco-agent.ini
+
+db_input high oco-agent/agent-key || true
+db_go || true
+db_get oco-agent/agent-key
+sed -i "s|AGENTKEY|$RET|g" /etc/oco-agent.ini
+
+# start service
+systemctl daemon-reload
+systemctl enable oco-agent
+#systemctl start oco-agent

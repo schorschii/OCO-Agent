@@ -1,0 +1,5 @@
+#!/bin/bash
+
+systemctl stop oco-agent
+systemctl disable oco-agent
+

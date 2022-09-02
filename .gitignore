@@ -1,6 +1,13 @@
 oco-agent.ini
+
 __pycache__/
+
 build/
 dist/
-installer/Output
-!installer/oco-agent.ini
+
+installer/windows/*.exe
+installer/debian/*.deb
+installer/debian/oco-agent/usr/
+installer/debian/oco-agent/etc/systemd/system
+!installer/debian/oco-agent/usr/bin/.placeholder
+!installer/debian/oco-agent/etc/systemd/system/.placeholder

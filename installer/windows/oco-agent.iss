@@ -7,7 +7,8 @@
 #define MyAppURL "https://github.com/schorschii/OCO-Agent"
 #define MyAppSupportURL "https://sieber.systems/"
 #define MyAppDir "C:\Program Files\OCO Agent"
-#define AgentConfigFile MyAppDir+"\oco-agent.ini"
+#define AgentConfigFileName "oco-agent.ini"
+#define AgentConfigFilePath MyAppDir+"\"+AgentConfigFileName
 #define AgentApiEndpoint "/api-agent.php"
 
 [Setup]
@@ -30,6 +31,7 @@ DisableProgramGroupPage=yes
 DisableWelcomePage=no
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
+OutputDir=".\"
 OutputBaseFilename=oco-agent
 CloseApplications=no
 Compression=lzma
@@ -41,9 +43,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "..\LICENSE.
 ; Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Files]
-Source: "..\dist\oco-agent.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\dist\service-wrapper.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: ".\oco-agent.ini"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
+Source: "..\..\dist\oco-agent.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\service-wrapper.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\oco-agent.dist.ini"; DestDir: "{app}"; DestName: "oco-agent.ini"; Flags: ignoreversion onlyifdoesntexist
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [UninstallRun]
@@ -85,7 +87,7 @@ var
   DefaultServerName: string;
   DefaultAgentKey: string;
 begin
-  if not FileExists('{#AgentConfigFile}') then
+  if not FileExists('{#AgentConfigFilePath}') then
   begin
     CustomQueryPage := CreateInputQueryPage(  
       wpLicense,
@@ -153,13 +155,13 @@ begin
       begin
         ServerName := 'https://'+CustomQueryPage.Values[0]+'{#AgentApiEndpoint}'
       end;
-      FileReplaceString(ExpandConstant('{#AgentConfigFile}'), 'SERVERURL', ServerName);
-      FileReplaceString(ExpandConstant('{#AgentConfigFile}'), 'AGENTKEY', CustomQueryPage.Values[1]);
+      FileReplaceString(ExpandConstant('{#AgentConfigFilePath}'), 'SERVERURL', ServerName);
+      FileReplaceString(ExpandConstant('{#AgentConfigFilePath}'), 'AGENTKEY', CustomQueryPage.Values[1]);
     end;
 
     WizardForm.StatusLabel.Caption := 'Restrict permissions on agent config file...'
-    Exec('icacls', '"'+ExpandConstant('{#AgentConfigFile}')+'" /inheritance:d', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('icacls', '"'+ExpandConstant('{#AgentConfigFile}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /inheritance:d', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     WizardForm.StatusLabel.Caption := 'Register and start service..'
     if not (CustomQueryPage = nil) then

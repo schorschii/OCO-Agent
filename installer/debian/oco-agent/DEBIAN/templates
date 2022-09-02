@@ -1,0 +1,10 @@
+Template: oco-agent/server-name
+Type: string
+Default: oco.example.com
+Description: Please enter the DNS name (FQDN) of your OCO server.
+ You can change it later by directly editing the config file /etc/oco-agent.ini.
+
+Template: oco-agent/agent-key
+Type: string
+Description: Please enter the agent key which should be used to authenticate against your OCO server.
+
