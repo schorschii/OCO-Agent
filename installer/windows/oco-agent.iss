@@ -20,8 +20,8 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppSupportURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-WizardImageFile="..\assets\installer-side-img.bmp"
-WizardSmallImageFile="..\assets\installer-top-img.bmp"
+WizardImageFile="..\..\assets\installer-side-img.bmp"
+WizardSmallImageFile="..\..\assets\installer-top-img.bmp"
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon="{#MyAppDir}\oco-agent.exe,0"
 DefaultDirName={#MyAppDir}
@@ -39,7 +39,7 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "..\LICENSE.txt"
+Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "..\..\LICENSE.txt"
 ; Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Files]
