@@ -163,7 +163,7 @@ begin
     Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /inheritance:d', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-    WizardForm.StatusLabel.Caption := 'Register and start service..'
+    WizardForm.StatusLabel.Caption := 'Register and start service...'
     if not (CustomQueryPage = nil) then
     begin
       Exec(ExpandConstant('{app}\service-wrapper.exe'), '--startup auto install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
