@@ -52,6 +52,10 @@ Source: "..\..\oco-agent.dist.ini"; DestDir: "{app}"; DestName: "oco-agent.ini";
 Filename: "{app}\service-wrapper.exe"; Parameters: "stop"
 Filename: "{app}\service-wrapper.exe"; Parameters: "remove"
 
+[UninstallDelete]
+Type: files; Name: "{app}\service-wrapper-old.exe"
+Type: files; Name: "{app}\oco-agent-old.exe"
+
 [Code]
 var
   CustomQueryPage: TInputQueryWizardPage;
