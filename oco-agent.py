@@ -164,9 +164,10 @@ def getMachineUid():
 		for o in w.Win32_ComputerSystemProduct(): uid = o.UUID
 	elif "linux" in OS_TYPE:
 		command = "dmidecode -s system-uuid"
+		uid = os.popen(command).read().replace("\n","").replace("\t","").replace(" ","")
 	elif "darwin" in OS_TYPE:
 		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
-	uid = os.popen(command).read().replace("\n","").replace("\t","").replace(" ","")
+		uid = os.popen(command).read().replace("\n","").replace("\t","").replace(" ","")
 	if uid.strip() == "": uid = getHostname() # fallback
 	return uid
 
