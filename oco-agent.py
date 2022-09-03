@@ -157,6 +157,19 @@ def getKernelVersion():
 	elif "linux" in OS_TYPE or "darwin" in OS_TYPE:
 		return platform.release()
 
+def getMachineUid():
+	uid = ""
+	if "win32" in OS_TYPE:
+		w = wmi.WMI()
+		for o in w.Win32_ComputerSystemProduct(): uid = o.UUID
+	elif "linux" in OS_TYPE:
+		command = "dmidecode -s system-uuid"
+	elif "darwin" in OS_TYPE:
+		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
+	uid = os.popen(command).read().replace("\n","").replace("\t","").replace(" ","")
+	if uid.strip() == "": uid = getHostname() # fallback
+	return uid
+
 def getMachineSerial():
 	if "win32" in OS_TYPE:
 		w = wmi.WMI()
@@ -666,6 +679,7 @@ def jsonRequest(method, data):
 		"id": 1,
 		"method": method,
 		"params": {
+			"uid": getMachineUid(),
 			"hostname": getHostname(),
 			"agent-key": config["agent-key"],
 			"data": data
@@ -816,6 +830,7 @@ def mainloop():
 		if(responseJson["result"]["params"]["update"] == 1):
 			print(logtime()+"Updating inventory data...")
 			data = {
+				'hostname': getHostname(),
 				'agent_version': AGENT_VERSION,
 				'os': getOs(),
 				'os_version': getOsVersion(),
@@ -871,7 +886,7 @@ def mainloop():
 					if(job['download'] == True):
 						jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
-						payloadparams = { 'hostname' : getHostname(), 'agent-key' : config['agent-key'], 'id' : job['package-id'] }
+						payloadparams = { 'uid': getMachineUid(), 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id'] }
 						downloadFile(config['api-url'], payloadparams, tempZipPath)
 
 						with ZipFile(tempZipPath, 'r') as zipObj:
