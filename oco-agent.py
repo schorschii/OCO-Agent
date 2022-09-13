@@ -868,7 +868,7 @@ def mainloop():
 					continue
 				if(job['procedure'].strip() == ''):
 					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
-					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': ''})
+					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': ''})
 					continue
 				if(restartFlag == True):
 					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
@@ -885,7 +885,7 @@ def mainloop():
 
 					# download if needed
 					if(job['download'] == True):
-						jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
+						jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
 
 						payloadparams = { 'uid': getMachineUid(), 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id'] }
 						downloadFile(config['api-url'], payloadparams, tempZipPath)
@@ -894,12 +894,12 @@ def mainloop():
 							zipObj.extractall(tempPath)
 
 					# change to tmp dir and execute procedure
-					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
+					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
 					os.chdir(tempPath)
 					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-					jobStatusRequest = jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': guessEncodingAndDecode(res.stdout)})
+					jobStatusRequest = jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': guessEncodingAndDecode(res.stdout)})
 
-					# check server's update_deploy_status response
+					# check server's update_job_state response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
 					if('container-id' in job and 'sequence-mode' in job and job['sequence-mode'] == 1 and jobStatusRequest != None and jobStatusRequest.status_code == 200):
 						jobStatusResponseJson = jobStatusRequest.json()
@@ -946,7 +946,7 @@ def mainloop():
 
 				except Exception as e:
 					print(logtime()+str(e))
-					jsonRequest('oco.agent.update_deploy_status', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
+					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
 					os.chdir(tempfile.gettempdir())
 
 
