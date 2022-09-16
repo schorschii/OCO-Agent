@@ -11,9 +11,9 @@ fi
 # cd to working dir
 cd "$(dirname "$0")"
 
-# remove git placeholders
-rm oco-agent/etc/systemd/system/.placeholder
-rm oco-agent/usr/bin/.placeholder
+# create necessary directories
+mkdir -p oco-agent/etc/systemd/system
+mkdir -p oco-agent/usr/bin
 
 # copy files in place
 cp ../../oco-agent.py oco-agent/usr/bin/oco-agent
@@ -28,9 +28,4 @@ chmod 660 oco-agent/etc/oco-agent.ini
 # build deb
 dpkg-deb --build oco-agent
 
-# re-add git placeholders
-touch oco-agent/etc/systemd/system/.placeholder
-touch oco-agent/usr/bin/.placeholder
-
 echo "Build finished"
-
