@@ -124,4 +124,4 @@ service-wrapper.exe start
 ```
 
 ## Debugging
-In case of problems, you can debug the agent by manually executing the script or compiled binary in terminal as root/Administrator, so you can check its output. Set the `debug = 1` in the agent config file for more verbose output.
+In case of problems, you can debug the agent by manually executing the script or compiled binary in terminal as root/Administrator, so you can check its output. Set the `debug = 1` option in the agent config file for more verbose output.
