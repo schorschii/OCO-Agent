@@ -1,7 +1,10 @@
+.DS_Store
+
 oco-agent.ini
 
 __pycache__/
 
+*.spec
 build/
 dist/
 
