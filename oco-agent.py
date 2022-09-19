@@ -49,7 +49,7 @@ if "win32" in OS_TYPE: import wmi, winreg
 restartFlag = False
 config = {
 	"debug": False,
-	"connection-timeout": 12,
+	"connection-timeout": 25,
 	"query-interval": 60,
 	"agent-key": "",
 	"api-url": "",
