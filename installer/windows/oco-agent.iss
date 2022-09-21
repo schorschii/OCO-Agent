@@ -120,7 +120,6 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  InfFile: string;
   ServerName: string;
 begin
   { agent update: stop and remove old service }
