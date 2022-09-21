@@ -58,7 +58,7 @@ For a fully automated installation, it is necessary to hand over the OCO server 
   ServerName=oco.example.com
   AgentKey=1235678
   ```
-  Then, call the setup with the parameter `/LOADINF=oco-agent-setup.inf /SILENT`. Delete the `oco-agent-setup.inf` file after the agent installation to protect the agent key.
+  Then, call the setup with the parameter `/LOADINF=.\oco-agent-setup.inf /SILENT`. Delete the `oco-agent-setup.inf` file after the agent installation to protect the agent key.
 
 ### Manually
 Set the URL to the server's `api-agent.php` and set correct agent key (as defined on the server's config file) manually in the agent config file `oco-agent.ini`. The agent config file can be found in the installation directory on Windows or under `/etc` on Linux. After that, restart the service.
