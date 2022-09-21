@@ -60,6 +60,7 @@ Type: files; Name: "{app}\oco-agent-old.exe"
 var
   CustomQueryPage: TInputQueryWizardPage;
   ResultCode: Integer;
+  DoNotStartService: bool;
 
 function FileReplaceString(const FileName, SearchString, ReplaceString: string):boolean;
 var
@@ -110,6 +111,7 @@ begin
     begin
       DefaultServerName := GetIniString('Setup', 'ServerName', DefaultServerName, InfFile)
       DefaultAgentKey   := GetIniString('Setup', 'AgentKey', DefaultAgentKey, InfFile)
+      DoNotStartService := GetIniBool('Setup', 'DoNotStartService', false, InfFile)
     end;
     CustomQueryPage.Values[0] := DefaultServerName
     CustomQueryPage.Values[1] := DefaultAgentKey
@@ -118,6 +120,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
+  InfFile: string;
   ServerName: string;
 begin
   { agent update: stop and remove old service }
@@ -149,7 +152,7 @@ begin
     end;
   end;
 
-  { postinstall: replace placeholders in config file, deny user access, start services }
+  { postinstall: replace placeholders in config file, deny user access }
   if CurStep = ssPostInstall then
   begin
     WizardForm.StatusLabel.Caption := 'Writing agent config file...'
@@ -167,11 +170,18 @@ begin
     Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /inheritance:d', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-    WizardForm.StatusLabel.Caption := 'Register and start service...'
+    { install and start services if it is a new installation }
     if not (CustomQueryPage = nil) then
     begin
+      WizardForm.StatusLabel.Caption := 'Register service...'
       Exec(ExpandConstant('{app}\service-wrapper.exe'), '--startup auto install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-      Exec(ExpandConstant('{app}\service-wrapper.exe'), 'start', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+      { do not start service if corresponding parameter is set in .inf }
+      if not DoNotStartService then
+      begin
+        WizardForm.StatusLabel.Caption := 'Start service...'
+        Exec(ExpandConstant('{app}\service-wrapper.exe'), 'start', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
     end;
   end;
 end;
