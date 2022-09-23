@@ -49,7 +49,8 @@ if "win32" in OS_TYPE: import wmi, winreg
 restartFlag = False
 config = {
 	"debug": False,
-	"connection-timeout": 25,
+	"connection-timeout": 3.05,
+	"read-timeout": 120,
 	"query-interval": 60,
 	"agent-key": "",
 	"api-url": "",
@@ -667,7 +668,7 @@ def getLogins():
 ##### AGENT-SERVER COMMUNICATION FUNCTIONS #####
 
 def downloadFile(url, params, path):
-	with requests.get(url, params=params, stream=True, timeout=config["connection-timeout"]) as r:
+	with requests.get(url, params=params, stream=True, timeout=(config["connection-timeout"],config["read-timeout"])) as r:
 		r.raise_for_status()
 		with open(path, 'wb') as f:
 			for chunk in r.iter_content(chunk_size=8192): 
@@ -691,7 +692,7 @@ def jsonRequest(method, data):
 	try:
 		# send request
 		if(config["debug"]): print(logtime()+"< " + data_json)
-		response = requests.post(config["api-url"], data=data_json, headers=headers, timeout=config["connection-timeout"])
+		response = requests.post(config["api-url"], data=data_json, headers=headers, timeout=(config["connection-timeout"],config["read-timeout"]))
 
 		# print response
 		if(config["debug"]): print(logtime()+"> (" + str(response.elapsed.total_seconds()) + "s) [" + str(response.status_code) + "] " + response.text)
@@ -967,6 +968,7 @@ try:
 	configParser.read(configFilePath)
 	if(configParser.has_option("agent", "debug")): config["debug"] = (int(configParser.get("agent", "debug")) == 1)
 	if(configParser.has_option("agent", "connection-timeout")): config["connection-timeout"] = int(configParser.get("agent", "connection-timeout"))
+	if(configParser.has_option("agent", "read-timeout")): config["read-timeout"] = int(configParser.get("agent", "read-timeout"))
 	if(configParser.has_option("agent", "query-interval")): config["query-interval"] = int(configParser.get("agent", "query-interval"))
 	if(configParser.has_option("agent", "agent-key")): config["agent-key"] = configParser.get("agent", "agent-key")
 	if(configParser.has_option("server", "api-url")): config["api-url"] = configParser.get("server", "api-url")
