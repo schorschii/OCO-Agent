@@ -589,7 +589,7 @@ def queryRegistryUserGuid(querySid):
 		key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\"+querySid
 		reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
 		guid, regtype = winreg.QueryValueEx(reg, "Guid")
-		return guid.strip()
+		return guid.strip("{}")
 	except WindowsError as e: pass
 	return None
 def getLogins():
