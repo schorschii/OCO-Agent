@@ -664,6 +664,24 @@ def getLogins():
 				})
 	return users
 
+def getEvents(log, query, since):
+	dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
+	foundEvents = []
+	if "win32" in OS_TYPE:
+		from winevt import EventLog
+		try:
+			query = EventLog.Query(log, query)
+			for event in query:
+				dateObject = datetime.datetime.strptime(event.System.TimeCreated["SystemTime"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
+				if(dateObject <= dateObjectSince): continue
+				eventDict = {"event_id": event.EventID, "level": event.Level, "timestamp":dateObject.strftime("%Y-%m-%d %H:%M:%S"), "data":{}}
+				for data in event.EventData.children:
+					eventDict["data"][data['Name']] = str(data.cdata)
+				foundEvents.append(eventDict)
+		except Exception as e:
+			print(logtime()+str(e))
+	return foundEvents
+
 
 ##### AGENT-SERVER COMMUNICATION FUNCTIONS #####
 
@@ -949,6 +967,15 @@ def mainloop():
 					print(logtime()+str(e))
 					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
 					os.chdir(tempfile.gettempdir())
+
+		# send events if requested
+		if("events" in responseJson["result"]["params"]):
+			events = []
+			for eventQuery in responseJson["result"]["params"]["events"]:
+				if not "log" in eventQuery or not "query" in eventQuery or not "since" in eventQuery: continue
+				print(logtime()+"Querying events from "+eventQuery["log"]+"...")
+				events += getEvents(eventQuery["log"], eventQuery["query"], eventQuery["since"])
+			request = jsonRequest('oco.agent.events', {"events":events})
 
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
