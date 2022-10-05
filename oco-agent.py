@@ -41,7 +41,14 @@ EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
-if "win32" in OS_TYPE: import wmi, winreg
+if "win32" in OS_TYPE:
+	import wmi, winreg
+	from winevt import EventLog
+	from win32com.client import GetObject
+elif "linux" in OS_TYPE:
+	import utmp
+elif "darwin" in OS_TYPE:
+	import plistlib
 
 
 ##### GLOBAL VARIABLES #####
@@ -292,7 +299,6 @@ def getInstalledSoftware():
 						"description": ""
 					})
 	elif "darwin" in OS_TYPE:
-		import plistlib
 		appdirname = "/Applications"
 		appdir = os.fsencode(appdirname)
 		for app in os.listdir(appdir):
@@ -383,7 +389,6 @@ def getScreens():
 	screens = []
 	if "win32" in OS_TYPE:
 		try:
-			from win32com.client import GetObject
 			objWMI = GetObject(r'winmgmts:\\.\root\WMI').InstancesOf('WmiMonitorID')
 			for monitor in objWMI:
 				try:
@@ -607,7 +612,6 @@ def getLogins(since):
 		#  10: RemoteInteractive (RDP)
 		#  11: CachedInteractive (local console without connection to AD server)
 		try:
-			from winevt import EventLog
 			query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
 			consolidatedEventList = []
 			for event in query:
@@ -634,7 +638,6 @@ def getLogins(since):
 		except Exception as e:
 			print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
-		import utmp
 		with open("/var/log/wtmp", "rb") as fd:
 			buf = fd.read()
 			for entry in utmp.read(buf):
@@ -671,7 +674,6 @@ def getEvents(log, query, since):
 	try:
 		dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
 		if "win32" in OS_TYPE:
-			from winevt import EventLog
 			query = EventLog.Query(log, query)
 			for event in query:
 				dateObject = datetime.datetime.strptime(event.System.TimeCreated["SystemTime"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
