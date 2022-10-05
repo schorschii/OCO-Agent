@@ -592,8 +592,9 @@ def queryRegistryUserGuid(querySid):
 		return guid.strip("{}")
 	except WindowsError as e: pass
 	return None
-def getLogins():
+def getLogins(since):
 	users = []
+	dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
 	if "win32" in OS_TYPE:
 		# Logon Types
 		#  2: Interactive (local console)
@@ -607,9 +608,7 @@ def getLogins():
 		#  11: CachedInteractive (local console without connection to AD server)
 		try:
 			from winevt import EventLog
-			# query login events
-			query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
-			# parse event result set
+			query = EventLog.Query("Security", "<QueryList><Query><Select>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
 			consolidatedEventList = []
 			for event in query:
 				eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"", "LogonProcessName":"",
@@ -624,6 +623,7 @@ def getLogins():
 				for event in consolidatedEventList:
 					# example timestamp: 2021-04-09T13:47:14.719737700Z
 					dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
+					if(dateObject <= dateObjectSince): continue
 					users.append({
 						"guid": queryRegistryUserGuid(event["TargetUserSid"]),
 						"display_name": queryRegistryUserDisplayName(event["TargetUserSid"]),
@@ -640,6 +640,7 @@ def getLogins():
 			for entry in utmp.read(buf):
 				if(str(entry.type) == "UTmpRecordType.user_process"):
 					dateObject = datetime.datetime.utcfromtimestamp(entry.sec)
+					if(dateObject <= dateObjectSince): continue
 					users.append({
 						"display_name": os.popen("getent passwd "+shlex.quote(entry.user)+" | cut -d : -f 5").read().strip().rstrip(","),
 						"username": entry.user,
@@ -656,6 +657,7 @@ def getLogins():
 				dateObject = datetime.datetime.strptime(rawTimestamp, "%a %b %d %H:%M")
 				dateObject = dateObject.replace(tzinfo=tz.tzlocal()) # UTC time
 				if(dateObject.year == 1900): dateObject = dateObject.replace(year=datetime.date.today().year)
+				if(dateObject <= dateObjectSince): continue
 				users.append({
 					"display_name": os.popen("id -F "+shlex.quote(parts[0])).read().strip(),
 					"username": parts[0],
@@ -665,11 +667,11 @@ def getLogins():
 	return users
 
 def getEvents(log, query, since):
-	dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
 	foundEvents = []
-	if "win32" in OS_TYPE:
-		from winevt import EventLog
-		try:
+	try:
+		dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
+		if "win32" in OS_TYPE:
+			from winevt import EventLog
 			query = EventLog.Query(log, query)
 			for event in query:
 				dateObject = datetime.datetime.strptime(event.System.TimeCreated["SystemTime"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
@@ -678,8 +680,8 @@ def getEvents(log, query, since):
 				for data in event.EventData.children:
 					eventDict["data"][data['Name']] = str(data.cdata)
 				foundEvents.append(eventDict)
-		except Exception as e:
-			print(logtime()+str(e))
+	except Exception as e:
+		print(logtime()+str(e))
 	return foundEvents
 
 
@@ -847,6 +849,9 @@ def mainloop():
 			config["agent-key"] = configParser.get("agent", "agent-key")
 
 		# send computer info if requested
+		loginsSince = "2000-01-01 00:00:00"
+		if("logins-since" in responseJson["result"]["params"]):
+			loginsSince = responseJson["result"]["params"]["logins-since"]
 		if(responseJson["result"]["params"]["update"] == 1):
 			print(logtime()+"Updating inventory data...")
 			data = {
@@ -874,7 +879,7 @@ def mainloop():
 				'printers': getPrinters(),
 				'partitions': getPartitions(),
 				'software': getInstalledSoftware(),
-				'logins': getLogins()
+				'logins': getLogins(loginsSince)
 			}
 			request = jsonRequest('oco.agent.update', data)
 
