@@ -41,6 +41,10 @@ EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
 OS_TYPE = sys.platform.lower()
+
+
+##### OS SPECIFIC IMPORTS #####
+
 if "win32" in OS_TYPE:
 	import wmi, winreg
 	from winevt import EventLog
