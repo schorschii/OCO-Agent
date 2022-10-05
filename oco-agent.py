@@ -608,29 +608,29 @@ def getLogins(since):
 		#  11: CachedInteractive (local console without connection to AD server)
 		try:
 			from winevt import EventLog
-			query = EventLog.Query("Security", "<QueryList><Query><Select>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
+			query = EventLog.Query("Security", "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
 			consolidatedEventList = []
 			for event in query:
 				eventDict = { "TargetUserSid":"", "TargetUserName":"", "TargetDomainName":"", "LogonType":"", "IpAddress":"", "LogonProcessName":"",
 					"TimeCreated":event.System.TimeCreated["SystemTime"] }
 				# put data of interest to dict
 				for data in event.EventData.Data:
-					if(data["Name"] == "TargetUserSid" or data["Name"] == "TargetUserName" or data["Name"] == "TargetDomainName" or data["Name"] == "LogonType" or data["Name"] == "IpAddress" or data["Name"] == "LogonProcessName"):
+					if(data["Name"] in ["TargetUserSid", "TargetUserName", "TargetDomainName", "LogonType", "IpAddress", "LogonProcessName"]):
 						eventDict[data["Name"]] = data.cdata
 				# eliminate duplicates and curious system logins
 				if eventDict not in consolidatedEventList and eventDict["LogonProcessName"].strip() == "User32":
 					consolidatedEventList.append(eventDict)
-				for event in consolidatedEventList:
-					# example timestamp: 2021-04-09T13:47:14.719737700Z
-					dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
-					if(dateObject <= dateObjectSince): continue
-					users.append({
-						"guid": queryRegistryUserGuid(event["TargetUserSid"]),
-						"display_name": queryRegistryUserDisplayName(event["TargetUserSid"]),
-						"username": event["TargetDomainName"]+"\\"+event["TargetUserName"] if config["windows"]["username-with-domain"] else event["TargetUserName"],
-						"console": event["IpAddress"],
-						"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
-					})
+			for event in consolidatedEventList:
+				# example timestamp: 2021-04-09T13:47:14.719737700Z
+				dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
+				if(dateObject <= dateObjectSince): continue
+				users.append({
+					"guid": queryRegistryUserGuid(event["TargetUserSid"]),
+					"display_name": queryRegistryUserDisplayName(event["TargetUserSid"]),
+					"username": event["TargetDomainName"]+"\\"+event["TargetUserName"] if config["windows"]["username-with-domain"] else event["TargetUserName"],
+					"console": event["IpAddress"],
+					"timestamp": dateObject.strftime("%Y-%m-%d %H:%M:%S")
+				})
 		except Exception as e:
 			print(logtime()+str(e))
 	elif "linux" in OS_TYPE:
