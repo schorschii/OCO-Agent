@@ -975,7 +975,8 @@ def mainloop():
 				if not "log" in eventQuery or not "query" in eventQuery or not "since" in eventQuery: continue
 				print(logtime()+"Querying events from "+eventQuery["log"]+"...")
 				events += getEvents(eventQuery["log"], eventQuery["query"], eventQuery["since"])
-			request = jsonRequest('oco.agent.events', {"events":events})
+			if(len(events) > 0):
+				request = jsonRequest('oco.agent.events', {"events":events})
 
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
