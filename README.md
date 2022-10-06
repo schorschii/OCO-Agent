@@ -125,3 +125,22 @@ service-wrapper.exe start
 
 ## Debugging
 In case of problems, you can debug the agent by manually executing the script or compiled binary in terminal as root/Administrator, so you can check its output. Set the `debug = 1` option in the agent config file for more verbose output.
+
+## Service Monitoring
+OCO offers basic monitoring features. You can check anything by writing your own service check script and placing it into the agent's local check directory (`/usr/lib/oco-agent/service-checks` on Linux; respectively `service-checks` inside the oco agent directory on Windows and macOS). Your script just have to produce standardised output in the [CheckMK check format](https://docs.checkmk.com/latest/de/localchecks.html).
+
+Please note that your scripts are executed on every agent execution. You have to care about caching by yourself if your script has a long runtime or produces heavy CPU load.
+
+### Example: Check If A Windows Service Is Running
+```
+@echo off
+
+for /F "tokens=3 delims=: " %%H in ('sc query Sense ^| findstr "        STATE"') do (
+  if /I "%%H" NEQ "RUNNING" (
+   echo 2 "Windows Defender Advanced Threat Protection Service" - Service is not running!
+   exit
+  )
+)
+
+echo 0 "Windows Defender Advanced Threat Protection Service" - Service is running
+```

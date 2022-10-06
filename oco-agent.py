@@ -40,6 +40,7 @@ AGENT_VERSION = "0.15.2"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
+SERVICE_CHECKS_PATH = EXECUTABLE_PATH+"/service-checks"
 OS_TYPE = sys.platform.lower()
 
 
@@ -51,6 +52,7 @@ if "win32" in OS_TYPE:
 	from win32com.client import GetObject
 elif "linux" in OS_TYPE:
 	import utmp
+	SERVICE_CHECKS_PATH = "/usr/lib/oco-agent/service-checks"
 elif "darwin" in OS_TYPE:
 	import plistlib
 
@@ -690,6 +692,23 @@ def getEvents(log, query, since):
 		print(logtime()+str(e))
 	return foundEvents
 
+def getServiceStatus():
+	services = []
+	if not os.path.exists(SERVICE_CHECKS_PATH): return
+	for file in [f for f in os.listdir(SERVICE_CHECKS_PATH) if os.path.isfile(os.path.join(SERVICE_CHECKS_PATH, f))]:
+		serviceScriptPath = os.path.join(SERVICE_CHECKS_PATH, file)
+		print(logtime()+"Executing service check script "+serviceScriptPath+"...")
+		res = subprocess.run(serviceScriptPath, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+		# example output (CheckMK format): 0 "My service" myvalue=73;80;90 My output text
+		# https://docs.checkmk.com/latest/de/localchecks.html
+		for line in guessEncodingAndDecode(res.stdout).splitlines():
+			values = shlex.split(line)
+			if(len(values) < 4):
+				print("  invalid output from script: "+line)
+				continue
+			services.append({"status":values[0], "name":values[1], "merics":values[2], "details":" ".join(values[3:])})
+	return services
+
 
 ##### AGENT-SERVER COMMUNICATION FUNCTIONS #####
 
@@ -828,6 +847,7 @@ def mainloop():
 	data = {
 		"agent_version": AGENT_VERSION,
 		"networks": getNics(),
+		"services": getServiceStatus(),
 	}
 	request = jsonRequest("oco.agent.hello", data)
 
