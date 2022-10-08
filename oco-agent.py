@@ -680,15 +680,17 @@ def getEvents(log, query, since):
 	try:
 		dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
 		if "win32" in OS_TYPE:
-			print(logtime()+"Querying events from "+eventQuery["log"]+"...")
+			startTime = time.time()
+			print(logtime()+"Querying events from "+log+"...")
 			query = EventLog.Query(log, query)
 			for event in query:
 				dateObject = datetime.datetime.strptime(event.System.TimeCreated["SystemTime"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
 				if(dateObject <= dateObjectSince): continue
-				eventDict = {"event_id": event.EventID, "level": event.Level, "timestamp":dateObject.strftime("%Y-%m-%d %H:%M:%S"), "data":{}}
+				eventDict = {"log": log, "provider": event.System.Provider["Name"], "event_id": event.EventID, "level": event.Level, "timestamp":dateObject.strftime("%Y-%m-%d %H:%M:%S"), "data":{}}
 				for data in event.EventData.children:
 					eventDict["data"][data['Name']] = str(data.cdata)
 				foundEvents.append(eventDict)
+			if(config["debug"]): print("  took "+str(time.time()-startTime))
 	except Exception as e:
 		print(logtime()+str(e))
 	return foundEvents
@@ -698,6 +700,7 @@ def getServiceStatus():
 	if not os.path.exists(SERVICE_CHECKS_PATH): return
 	for file in [f for f in os.listdir(SERVICE_CHECKS_PATH) if os.path.isfile(os.path.join(SERVICE_CHECKS_PATH, f))]:
 		serviceScriptPath = os.path.join(SERVICE_CHECKS_PATH, file)
+		startTime = time.time()
 		print(logtime()+"Executing service check script "+serviceScriptPath+"...")
 		res = subprocess.run(serviceScriptPath, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
 		# example output (CheckMK format): 0 "My service" myvalue=73;80;90 My output text
@@ -708,6 +711,7 @@ def getServiceStatus():
 				print("  invalid output from script: "+line)
 				continue
 			services.append({"status":values[0], "name":values[1], "merics":values[2], "details":" ".join(values[3:])})
+		if(config["debug"]): print("  took "+str(time.time()-startTime))
 	return services
 
 
