@@ -14,6 +14,7 @@ cd "$(dirname "$0")"
 # create necessary directories
 mkdir -p oco-agent/etc/systemd/system
 mkdir -p oco-agent/usr/bin
+mkdir -p oco-agent/lib/oco-agent/service-checks
 
 # copy files in place
 cp ../../oco-agent.py oco-agent/usr/bin/oco-agent
