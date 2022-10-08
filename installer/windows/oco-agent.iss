@@ -48,6 +48,9 @@ Source: "..\..\dist\service-wrapper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\oco-agent.dist.ini"; DestDir: "{app}"; DestName: "oco-agent.ini"; Flags: ignoreversion onlyifdoesntexist
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
+[Dirs]
+Name: {app}\service-checks
+
 [UninstallRun]
 Filename: "{app}\service-wrapper.exe"; Parameters: "stop"
 Filename: "{app}\service-wrapper.exe"; Parameters: "remove"
