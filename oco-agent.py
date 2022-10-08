@@ -680,6 +680,7 @@ def getEvents(log, query, since):
 	try:
 		dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S")
 		if "win32" in OS_TYPE:
+			print(logtime()+"Querying events from "+eventQuery["log"]+"...")
 			query = EventLog.Query(log, query)
 			for event in query:
 				dateObject = datetime.datetime.strptime(event.System.TimeCreated["SystemTime"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
@@ -1004,7 +1005,6 @@ def mainloop():
 			events = []
 			for eventQuery in responseJson["result"]["params"]["events"]:
 				if not "log" in eventQuery or not "query" in eventQuery or not "since" in eventQuery: continue
-				print(logtime()+"Querying events from "+eventQuery["log"]+"...")
 				events += getEvents(eventQuery["log"], eventQuery["query"], eventQuery["since"])
 			if(len(events) > 0):
 				request = jsonRequest('oco.agent.events', {"events":events})
