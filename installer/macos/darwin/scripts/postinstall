@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+function prompt() {
+  osascript <<EOT
+    with timeout of 3600 seconds
+    tell app "System Events"
+      text returned of (display dialog "$1" default answer "$2" buttons {"OK"} default button 1 with title "OCO Agent for macOS Setup")
+    end tell
+    end timeout
+EOT
+}
+
+CONFIGFILE="/opt/oco-agent/oco-agent.ini"
+
+if [ ! -f "$CONFIGFILE" ]; then
+
+echo "[agent]
+debug = 0
+query-interval = 60
+agent-key = AGENTKEY
+
+[server]
+api-url = APIURL
+payload-url = PAYLOADURL" > $CONFIGFILE
+
+else
+
+echo "Config file already exists"
+
+fi
+
+chmod 0600 $CONFIGFILE
+chown root:wheel $CONFIGFILE
+
+sudo grep "APIURL" $CONFIGFILE
+if [ "$?" == "0" ]; then
+	SERVERNAME=$(prompt 'Please enter the address of your OCO server (DNS name or IP address). Leave it empty for DNS auto discovery.' '')
+	if [ "$SERVERNAME" == "" ]; then
+		APIURL=""
+		PAYLOADURL=""
+	else
+		APIURL="https:\/\/$SERVERNAME\/api-agent.php"
+		PAYLOADURL="https:\/\/$SERVERNAME\/payloadprovider.php"
+	fi
+	sudo sed -i -e "s/APIURL/$APIURL/g" $CONFIGFILE
+	sudo sed -i -e "s/PAYLOADURL/$PAYLOADURL/g" $CONFIGFILE
+fi
+
+sudo grep "AGENTKEY" $CONFIGFILE
+if [ "$?" == "0" ]; then
+	AGENTKEY=$(prompt 'Please enter your agent key.' '')
+	sudo sed -i -e "s/AGENTKEY/$AGENTKEY/g" $CONFIGFILE
+fi
+
+# start service if not already running
+launchctl print system/systems.sieber.oco-agent 2>/dev/null
+if [ "$?" != "0" ]; then
+	sudo launchctl load /Library/LaunchDaemons/systems.sieber.oco-agent.plist && echo "OCO Agent Service started"
+fi

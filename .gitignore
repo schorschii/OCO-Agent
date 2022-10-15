@@ -9,6 +9,7 @@ build/
 dist/
 
 installer/windows/*.exe
+installer/macos/target/*
 installer/debian/*.deb
 installer/debian/oco-agent/*
 !installer/debian/oco-agent/DEBIAN/
