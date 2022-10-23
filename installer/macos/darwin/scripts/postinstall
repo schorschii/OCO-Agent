@@ -21,7 +21,7 @@ agent-key = AGENTKEY
 
 [server]
 api-url = APIURL
-payload-url = PAYLOADURL" > $CONFIGFILE
+server-key =" > $CONFIGFILE
 
 else
 
