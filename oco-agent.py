@@ -687,8 +687,9 @@ def getEvents(log, query, since):
 				dateObject = datetime.datetime.strptime(event.System.TimeCreated["SystemTime"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
 				if(dateObject <= dateObjectSince): continue
 				eventDict = {"log": log, "provider": event.System.Provider["Name"], "event_id": event.EventID, "level": event.Level, "timestamp":dateObject.strftime("%Y-%m-%d %H:%M:%S"), "data":{}}
-				for data in event.EventData.children:
-					eventDict["data"][data['Name']] = str(data.cdata)
+				if(hasattr(event, 'EventData')):
+					for data in event.EventData.children:
+						eventDict["data"][data['Name']] = str(data.cdata)
 				foundEvents.append(eventDict)
 			if(config["debug"]): print("  took "+str(time.time()-startTime))
 	except Exception as e:
