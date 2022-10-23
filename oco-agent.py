@@ -605,8 +605,7 @@ def queryRegistryUserGuid(querySid):
 	return None
 def getLogins(since):
 	users = []
-	dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc) # server's `since` vaue is in UTC
-	print('since:', dateObjectSince)
+	dateObjectSince = datetime.datetime.strptime(since, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc) # server's `since` value is in UTC
 	if "win32" in OS_TYPE:
 		# Logon Types
 		#  2: Interactive (local console)
@@ -633,7 +632,7 @@ def getLogins(since):
 					consolidatedEventList.append(eventDict)
 			for event in consolidatedEventList:
 				# example timestamp: 2021-04-09T13:47:14.719737700Z
-				dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S")
+				dateObject = datetime.datetime.strptime(event["TimeCreated"].split(".")[0], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc) # Windows event log timestamps are in UTC
 				if(dateObject <= dateObjectSince): continue
 				users.append({
 					"guid": queryRegistryUserGuid(event["TargetUserSid"]),
@@ -649,7 +648,7 @@ def getLogins(since):
 			buf = fd.read()
 			for entry in utmp.read(buf):
 				if(str(entry.type) == "UTmpRecordType.user_process"):
-					dateObject = datetime.datetime.utcfromtimestamp(entry.sec)
+					dateObject = datetime.datetime.utcfromtimestamp(entry.sec).replace(tzinfo=datetime.timezone.utc) # utmp values are in UTC
 					if(dateObject <= dateObjectSince): continue
 					users.append({
 						"display_name": os.popen("getent passwd "+shlex.quote(entry.user)+" | cut -d : -f 5").read().strip().rstrip(","),
@@ -665,7 +664,7 @@ def getLogins(since):
 			if(len(parts) == 3 and parts[1] != "~" and parts[0] != "wtmp"):
 				rawTimestamp = " ".join(parts[2].split(" ", 4)[:-1])
 				dateObject = datetime.datetime.strptime(rawTimestamp, "%a %b %d %H:%M")
-				dateObject = dateObject.replace(tzinfo=tz.tzlocal()) # `last` out put is in local time - set TZ info for correct UTC conversion
+				dateObject = dateObject.replace(tzinfo=tz.tzlocal()) # `last` output is in local time - set TZ info for correct UTC conversion
 				if(dateObject.year == 1900): dateObject = dateObject.replace(year=datetime.date.today().year)
 				if(dateObject <= dateObjectSince): continue
 				users.append({
