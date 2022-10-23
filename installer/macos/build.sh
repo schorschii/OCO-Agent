@@ -7,7 +7,7 @@ TARGET_DIRECTORY="$SCRIPTPATH/target"
 PRODUCT="OCO Agent"
 VERSION="0.15.3"
 TARGET_FILENAME="oco-agent.pkg"
-APPLE_DEVELOPER_CERTIFICATE_ID=""
+APPLE_DEVELOPER_CERTIFICATE_ID="Georg Sieber (96G8V7UY3M)"
 
 
 # create/clean target build directory
