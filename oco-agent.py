@@ -36,7 +36,7 @@ from dns import resolver, rdatatype
 
 ##### CONSTANTS #####
 
-AGENT_VERSION = "0.15.2"
+AGENT_VERSION = "0.15.3"
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+"/oco-agent.ini"
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
