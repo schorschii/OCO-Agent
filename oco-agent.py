@@ -914,15 +914,6 @@ def mainloop():
 			}
 			request = jsonRequest('oco.agent.update', data)
 
-			# send events from logs if requested
-			if("events" in responseJson["result"]["params"]):
-				events = []
-				for eventQuery in responseJson["result"]["params"]["events"]:
-					if not "log" in eventQuery or not "query" in eventQuery or not "since" in eventQuery: continue
-					events += getEvents(eventQuery["log"], eventQuery["query"], eventQuery["since"])
-				if(len(events) > 0):
-					request = jsonRequest('oco.agent.events', {"events":events})
-
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
 			ignoreContainerIds = []
@@ -1013,6 +1004,14 @@ def mainloop():
 					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
 					os.chdir(tempfile.gettempdir())
 
+		# send events from logs if requested
+		if("events" in responseJson["result"]["params"]):
+			events = []
+			for eventQuery in responseJson["result"]["params"]["events"]:
+				if not "log" in eventQuery or not "query" in eventQuery or not "since" in eventQuery: continue
+				events += getEvents(eventQuery["log"], eventQuery["query"], eventQuery["since"])
+			if(len(events) > 0):
+				request = jsonRequest('oco.agent.events', {"events":events})
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 
