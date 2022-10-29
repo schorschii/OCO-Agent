@@ -112,8 +112,7 @@ pip install wmi pywin32 winevt  # Windows specific modules
 # https://github.com/bannsec/winevt/pull/13/files
 # https://github.com/bannsec/winevt/pull/12/files
 
-pyinstaller -F --icon=assets/logo.ico oco-agent.py
-pyinstaller -F --hidden-import=win32timezone --icon=assets/logo-service.ico service-wrapper.py
+pyinstaller oco-agent-windows.spec
 
 # move compiled `service-wrapper.exe` files to: `C:\Program Files\OCO Agent\service-wrapper.exe`
 # move compiled `oco-agent.exe` files to: `C:\Program Files\OCO Agent\oco-agent.exe`

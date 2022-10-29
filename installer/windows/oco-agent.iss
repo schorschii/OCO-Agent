@@ -43,8 +43,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "..\..\LICEN
 ; Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Files]
-Source: "..\..\dist\oco-agent.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\dist\service-wrapper.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\oco-agent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\..\oco-agent.dist.ini"; DestDir: "{app}"; DestName: "oco-agent.ini"; Flags: ignoreversion onlyifdoesntexist
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
