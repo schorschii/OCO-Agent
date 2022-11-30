@@ -28,6 +28,6 @@ chmod 774 oco-agent/usr/bin/oco-agent
 chmod 660 oco-agent/etc/oco-agent.ini
 
 # build deb
-dpkg-deb --build oco-agent
+dpkg-deb -Zxz --build oco-agent
 
 echo "Build finished"
