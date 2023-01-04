@@ -1042,7 +1042,7 @@ try:
 	if(config['api-url'].strip() == ''):
 		print(logtime()+'Server API URL is empty - trying DNS auto discovery ...')
 		try:
-			res = resolver.query(qname='_oco._tcp', rdtype=rdatatype.SRV, lifetime=10)
+			res = resolver.resolve(qname='_oco._tcp', rdtype=rdatatype.SRV, lifetime=10, search=True)
 			for srv in res.rrset:
 				config['api-url'] = 'https://'+str(srv.target)+':'+str(srv.port)+'/api-agent.php'
 				print(logtime()+'DNS auto discovery found server: '+config['api-url'])
