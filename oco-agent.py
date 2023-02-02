@@ -252,6 +252,20 @@ def getSecureBootEnabled():
 		secureboot = '1' if 'enabled' in os.popen(command).read().replace('\t','').replace(' ','') else '0'
 	return secureboot
 
+def queryAppxPackages():
+	packages = []
+	try:
+		# this silently fails under Windows 7 and older since there is no Get-AppxPackage cmdlet and no AppX packages at all
+		result = subprocess.run(['powershell.exe', '-executionpolicy', 'bypass', '-command', 'Get-AppxPackage -allusers | select Name, Version, Publisher, PackageUserInformation | ConvertTo-Json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
+		resultDecoded = json.loads(result.stdout)
+		for package in resultDecoded:
+			packages.append({
+				'name': '[AppX] '+package['Name'],
+				'version': package['Version'],
+				'description': package['Publisher']
+			})
+	except Exception as e: pass
+	return packages
 def queryRegistrySoftware(key):
 	software = []
 	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
@@ -291,7 +305,8 @@ def getInstalledSoftware():
 	if 'win32' in OS_TYPE:
 		x64software = queryRegistrySoftware('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall')
 		x32software = queryRegistrySoftware('SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')
-		software = x32software + x64software
+		appXpackages = queryAppxPackages()
+		software = x32software + x64software + appXpackages
 	elif 'linux' in OS_TYPE:
 		command = 'apt list --installed'
 		for l in os.popen(command).read().split('\n'):
