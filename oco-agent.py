@@ -691,6 +691,7 @@ def getLogins(since):
 	return users
 
 def getEvents(log, query, since):
+	maxBatch = 10000
 	foundEvents = []
 	try:
 		dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S')
@@ -701,11 +702,46 @@ def getEvents(log, query, since):
 			for event in query:
 				dateObject = datetime.datetime.strptime(event.System.TimeCreated['SystemTime'].split('.')[0], '%Y-%m-%dT%H:%M:%S')
 				if(dateObject <= dateObjectSince): continue
-				eventDict = {'log': log, 'provider': event.System.Provider['Name'], 'event_id': event.EventID, 'level': event.Level, 'timestamp':dateObject.strftime('%Y-%m-%d %H:%M:%S'), 'data':{}}
+				eventDict = {
+					'log': log,
+					'provider': event.System.Provider['Name'],
+					'event_id': event.EventID,
+					'level': event.Level,
+					'timestamp': dateObject.strftime('%Y-%m-%d %H:%M:%S'),
+					'data': {}
+				}
 				if(hasattr(event, 'EventData')):
 					for data in event.EventData.children:
 						eventDict['data'][data['Name']] = str(data.cdata)
 				foundEvents.append(eventDict)
+				if(len(foundEvents) > maxBatch): break
+			if(config['debug']): print('  took '+str(time.time()-startTime))
+		elif 'linux' in OS_TYPE and log == 'journalctl':
+			startTime = time.time()
+			print(logtime()+'Querying events from journalctl...')
+			queryData = json.loads(query)
+			from systemd import journal
+			j = journal.Reader()
+			if('unit' in queryData):
+				for x in queryData['unit'].split(','): j.add_match(_SYSTEMD_UNIT=x.strip())
+			if('identifier' in queryData):
+				for x in queryData['identifier'].split(','): j.add_match(SYSLOG_IDENTIFIER=x.strip())
+			if('priority' in queryData):
+				for x in queryData['priority'].split(','): j.add_match(PRIORITY=x.strip())
+				#j.log_level(journal.LOG_INFO)
+			j.seek_realtime(dateObjectSince)
+			j.get_next()
+			for entry in j:
+				if entry['MESSAGE'] != '' and (not 'grep' in queryData or queryData['grep'].upper() in entry['MESSAGE'].upper()):
+					foundEvents.append({
+						'log': entry['_SYSTEMD_UNIT'] if '_SYSTEMD_UNIT' in entry else 'journalctl',
+						'provider': entry['SYSLOG_IDENTIFIER'] if 'SYSLOG_IDENTIFIER' in entry else '',
+						'event_id': str(entry['SYSLOG_FACILITY']) if 'SYSLOG_FACILITY' in entry else '',
+						'level': str(entry['PRIORITY']) if 'PRIORITY' in entry else '',
+						'timestamp': entry['__REALTIME_TIMESTAMP'].strftime('%Y-%m-%d %H:%M:%S'),
+						'data': {'message':entry['MESSAGE']}
+					})
+					if(len(foundEvents) > maxBatch): break
 			if(config['debug']): print('  took '+str(time.time()-startTime))
 	except Exception as e:
 		print(logtime()+str(e))
