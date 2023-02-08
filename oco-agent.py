@@ -63,7 +63,7 @@ restartFlag = False
 config = {
 	'debug': False,
 	'connection-timeout': 3.05,
-	'read-timeout': 120,
+	'read-timeout': 150,
 	'query-interval': 60,
 	'agent-key': '',
 	'api-url': '',
