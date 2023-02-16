@@ -7,7 +7,7 @@ Updated: -
 Author: Georg Sieber
 
 ## Decision
-The OCO agent discovers its server automatically via the DNS SRV record `_oco._tcp.example.com` and writes the server name into the config file for further use if the `api-url` entry in the config file is currently empty.
+If the `api-url` entry in the config file is empty, the OCO agent discovers its server automatically via the DNS SRV record `_oco._tcp.example.com` and writes the server name into the config file for future use.
 
 ## Status
 Accepted
