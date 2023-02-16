@@ -11,6 +11,10 @@
 # ║              OCO-AGENT              ║
 # ╚═════════════════════════════════════╝
 
+try:
+	import pip_system_certs.wrapt_requests
+except ImportError: pass
+
 import requests
 import json
 import socket
