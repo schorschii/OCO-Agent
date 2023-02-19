@@ -131,25 +131,29 @@ begin
   //  Exec(ExpandConstant('{app}\service-wrapper.exe'), 'remove', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
   //end;
 
-  { agent update: rename existing/running agent because it can not be removed (restart needed to use new agent version) }
+  { agent update: rename existing/running agent because files of a running program can not be removed (restart needed to use new agent version) }
   if CurStep = ssInstall then
   begin
-    if FileExists(ExpandConstant('{app}\service-wrapper-old.exe')) then
+    { delete previous .old directory }
+    if DirExists(ExpandConstant('{app}.old\')) then
     begin
-      DeleteFile(ExpandConstant('{app}\service-wrapper-old.exe'))
+      DelTree(ExpandConstant('{app}.old\'), True, True, True)
     end;
-    if FileExists(ExpandConstant('{app}\service-wrapper.exe')) then
+    { rename current program folder to .old }
+    if DirExists(ExpandConstant('{app}\')) then
     begin
-      RenameFile(ExpandConstant('{app}\service-wrapper.exe'), ExpandConstant('{app}\service-wrapper-old.exe'))
+      RenameFile(ExpandConstant('{app}\'), ExpandConstant('{app}.old\'))
+      CreateDir(ExpandConstant('{app}\'))
     end;
-
-    if FileExists(ExpandConstant('{app}\oco-agent-old.exe')) then
+    { move config file back }
+    if FileExists(ExpandConstant('{app}.old\{#AgentConfigFileName}')) then
     begin
-      DeleteFile(ExpandConstant('{app}\oco-agent-old.exe'))
+      RenameFile(ExpandConstant('{app}.old\{#AgentConfigFileName}'), ExpandConstant('{#AgentConfigFilePath}'))
     end;
-    if FileExists(ExpandConstant('{app}\oco-agent.exe')) then
+    { move service checks back }
+    if DirExists(ExpandConstant('{app}.old\service-checks')) then
     begin
-      RenameFile(ExpandConstant('{app}\oco-agent.exe'), ExpandConstant('{app}\oco-agent-old.exe'))
+      RenameFile(ExpandConstant('{app}.old\service-checks'), ExpandConstant('{app}\service-checks'))
     end;
   end;
 
@@ -177,7 +181,7 @@ begin
       WizardForm.StatusLabel.Caption := 'Register service...'
       Exec(ExpandConstant('{app}\service-wrapper.exe'), '--startup auto install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-      { do not start service if corresponding parameter is set in .inf }
+      { do not start service if corresponding parameter is set in .inf - for usage in $OEM$ Windows setup }
       if not DoNotStartService then
       begin
         WizardForm.StatusLabel.Caption := 'Start service...'
