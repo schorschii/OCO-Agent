@@ -59,6 +59,7 @@ Type: filesandordirs; Name: "{app}.old"
 var
   CustomQueryPage: TInputQueryWizardPage;
   ResultCode: Integer;
+  InstallService: bool;
   DoNotStartService: bool;
 
 function FileReplaceString(const FileName, SearchString, ReplaceString: string):boolean;
@@ -91,6 +92,10 @@ var
   DefaultServerName: string;
   DefaultAgentKey: string;
 begin
+  { do not register the service again if this is an update }
+  InstallService := not FileExists('{#MyAppDir}\oco-agent.exe');
+
+  { ask for configuration values if no config file is present }
   if not FileExists('{#AgentConfigFilePath}') then
   begin
     CustomQueryPage := CreateInputQueryPage(  
@@ -121,10 +126,11 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
   begin
-    { UninstallProgressForm.StatusLabel.Caption := 'Stopping and removing service...' }
+    UninstallProgressForm.StatusLabel.Caption := 'Stopping and removing service...'
     Exec(ExpandConstant('{app}\service-wrapper.exe'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{app}\service-wrapper.exe'), 'remove', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(1000); { without this delay, windows screams that files are still in use }
+    UninstallProgressForm.StatusLabel.Caption := 'Removing files...'
   end;
 end;
 
@@ -184,7 +190,7 @@ begin
     Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     { install and start services if it is a new installation }
-    if not (CustomQueryPage = nil) then
+    if InstallService then
     begin
       WizardForm.StatusLabel.Caption := 'Register service...'
       Exec(ExpandConstant('{app}\service-wrapper.exe'), '--startup auto install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
