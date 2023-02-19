@@ -50,13 +50,10 @@ Source: "..\..\oco-agent.dist.ini"; DestDir: "{app}"; DestName: "oco-agent.ini";
 [Dirs]
 Name: {app}\service-checks
 
-[UninstallRun]
-Filename: "{app}\service-wrapper.exe"; Parameters: "stop"
-Filename: "{app}\service-wrapper.exe"; Parameters: "remove"
-
 [UninstallDelete]
 Type: files; Name: "{app}\service-wrapper-old.exe"
 Type: files; Name: "{app}\oco-agent-old.exe"
+Type: filesandordirs; Name: "{app}.old"
 
 [Code]
 var
@@ -117,6 +114,17 @@ begin
     end;
     CustomQueryPage.Values[0] := DefaultServerName
     CustomQueryPage.Values[1] := DefaultAgentKey
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    { UninstallProgressForm.StatusLabel.Caption := 'Stopping and removing service...' }
+    Exec(ExpandConstant('{app}\service-wrapper.exe'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{app}\service-wrapper.exe'), 'remove', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(1000); { without this delay, windows screams that files are still in use }
   end;
 end;
 
