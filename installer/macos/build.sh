@@ -5,7 +5,7 @@ set -e
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 TARGET_DIRECTORY="$SCRIPTPATH/target"
 PRODUCT="OCO Agent"
-VERSION="0.15.5"
+VERSION="0.16.0"
 TARGET_FILENAME="oco-agent.pkg"
 APPLE_DEVELOPER_CERTIFICATE_ID="Georg Sieber (96G8V7UY3M)"
 
