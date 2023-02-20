@@ -36,6 +36,7 @@ import shlex
 import pyedid
 from zipfile import ZipFile
 from dns import resolver, rdatatype
+import re
 
 
 ##### CONSTANTS #####
@@ -736,7 +737,7 @@ def getEvents(log, query, since):
 			j.seek_realtime(dateObjectSince)
 			j.get_next()
 			for entry in j:
-				if entry['MESSAGE'] != '' and (not 'grep' in queryData or queryData['grep'].upper() in entry['MESSAGE'].upper()):
+				if entry['MESSAGE'] != '' and (not 'grep' in queryData or re.search(queryData['grep'], entry['MESSAGE'])):
 					foundEvents.append({
 						'log': entry['_SYSTEMD_UNIT'] if '_SYSTEMD_UNIT' in entry else 'journalctl',
 						'provider': entry['SYSLOG_IDENTIFIER'] if 'SYSLOG_IDENTIFIER' in entry else '',
