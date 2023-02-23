@@ -7,7 +7,7 @@ set -e
 . /usr/share/debconf/confmodule
 
 # install modules which are not available in the Debian/Ubuntu repos
-sudo -H pip3 install --upgrade utmp pyedid
+pip3 install --upgrade utmp pyedid
 
 # ask and set settings
 # (use "echo PURGE | sudo debconf-communicate companion-linux" to reset)
