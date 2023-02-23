@@ -73,6 +73,7 @@ config = {
 	'agent-key': '',
 	'api-url': '',
 	'server-key': '',
+	'hostname-remove-domain': True,
 	'linux': {},
 	'macos': {},
 	'windows': {
@@ -85,8 +86,8 @@ config = {
 
 def getHostname():
 	hostname = socket.gethostname()
-	if 'darwin' in OS_TYPE:
-		if('.' in hostname): hostname = hostname.split('.', 1)[0]
+	if(config['hostname-remove-domain'] and '.' in hostname):
+		hostname = hostname.split('.', 1)[0]
 	return hostname
 
 def getNics():
@@ -1086,6 +1087,7 @@ try:
 	configParser = configparser.RawConfigParser()
 	configParser.read(configFilePath)
 	if(configParser.has_option('agent', 'debug')): config['debug'] = (int(configParser.get('agent', 'debug')) == 1)
+	if(configParser.has_option('agent', 'hostname-remove-domain')): config['hostname-remove-domain'] = (int(configParser.get('agent', 'hostname-remove-domain')) == 1)
 	if(configParser.has_option('agent', 'connection-timeout')): config['connection-timeout'] = int(configParser.get('agent', 'connection-timeout'))
 	if(configParser.has_option('agent', 'read-timeout')): config['read-timeout'] = int(configParser.get('agent', 'read-timeout'))
 	if(configParser.has_option('agent', 'query-interval')): config['query-interval'] = int(configParser.get('agent', 'query-interval'))
