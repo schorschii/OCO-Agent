@@ -1055,6 +1055,9 @@ def mainloop():
 					# execute agent exit if requested (for agent update)
 					if('exit' in job and job['exit'] != None and isinstance(job['exit'], int) and job['exit'] >= 0):
 						print(logtime()+'Agent Exit Requested. Bye...')
+						if 'win32' in OS_TYPE:
+							# restart service via scheduled task - if somebody has a better how to self-restart the service: contributions welcome!
+							subprocess.run(['SCHTASKS', '/CREATE', '/F', '/RU', 'SYSTEM', '/SC', 'ONCE', '/ST', (datetime.datetime.now()+datetime.timedelta(minutes=1)).strftime("%H:%M"), '/TN', 'OCO Service Restart After Update', '/TR', 'cmd /c "net stop oco-agent & net start oco-agent"'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
 						sys.exit(0)
 
 				except Exception as e:
