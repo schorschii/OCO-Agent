@@ -37,8 +37,7 @@ class OcoWinService(win32serviceutil.ServiceFramework):
 			self.main()
 			win32event.WaitForSingleObject(self.stop_event, win32event.INFINITE)
 		except Exception as e:
-			exc_type, exc_obj, exc_tb = sys.exc_info()
-			self.log('Exception '+str(exc_tb.tb_lineno)+':'+str(e))
+			self.log('SvcDoRun Exception: '+str(e))
 			self.SvcStop()
 
 	def start(self):
