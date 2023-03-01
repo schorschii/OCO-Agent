@@ -90,7 +90,7 @@ systemctl start oco-agent
 
 ### macOS
 ```
-pip install dnspython requests netifaces psutil distro python-dateutil pyedid
+pip install dnspython requests netifaces psutil distro python-dateutil pyedid pip-system-certs
 
 pyinstaller -F oco-agent.py
 
@@ -104,7 +104,7 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 
 ### Windows
 ```
-pip install dnspython requests netifaces psutil distro python-dateutil pyedid
+pip install dnspython requests netifaces psutil distro python-dateutil pyedid pip-system-certs
 pip install wmi pywin32 winevt  # Windows specific modules
 
 # since of April 2021, winevt has two bugs which prevents oco-agent from successfully parsing windows logins
