@@ -41,7 +41,7 @@ import re
 
 ##### CONSTANTS #####
 
-AGENT_VERSION = '0.16.0'
+AGENT_VERSION = '0.16.1'
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+'/oco-agent.ini'
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
