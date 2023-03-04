@@ -24,7 +24,12 @@ db_go || true
 db_get oco-agent/agent-key
 sed -i "s|AGENTKEY|$RET|g" /etc/oco-agent.ini
 
-# start service
-systemctl daemon-reload
-systemctl enable oco-agent
-#systemctl start oco-agent
+# register and start service
+systemctl daemon-reload || true
+systemctl enable oco-agent || true
+
+if [ "$(systemctl is-active oco-agent || true)" == "inactive" ]; then
+	systemctl start oco-agent || true
+else
+	echo "Service already running, no automatic restart is made in order to gracefully complete the OCO agent update software job"
+fi

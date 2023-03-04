@@ -1,5 +1,6 @@
 #!/bin/bash
 
-systemctl stop oco-agent
-systemctl disable oco-agent
-
+if [ "$1" != "upgrade" ]; then
+    systemctl stop oco-agent
+    systemctl disable oco-agent
+fi
