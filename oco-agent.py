@@ -921,6 +921,7 @@ def mainloop():
 		# save server key if server key is not already set in local config
 		if(config['server-key'] == None or config['server-key'] == ''):
 			print(logtime()+'Write new config with updated server key...')
+			if(not configParser.has_section('server')): configParser.add_section('server')
 			configParser.set('server', 'server-key', responseJson['result']['params']['server-key'])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
 			config['server-key'] = configParser.get('server', 'server-key')
@@ -933,6 +934,7 @@ def mainloop():
 		# update agent key if requested
 		if(responseJson['result']['params']['agent-key'] != None):
 			print(logtime()+'Write new config with updated agent key...')
+			if(not configParser.has_section('agent')): configParser.add_section('agent')
 			configParser.set('agent', 'agent-key', responseJson['result']['params']['agent-key'])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
 			config['agent-key'] = configParser.get('agent', 'agent-key')
@@ -1108,6 +1110,7 @@ try:
 			for srv in res.rrset:
 				config['api-url'] = 'https://'+str(srv.target)+':'+str(srv.port)+'/api-agent.php'
 				print(logtime()+'DNS auto discovery found server: '+config['api-url'])
+				if(not configParser.has_section('server')): configParser.add_section('server')
 				configParser.set('server', 'api-url', config['api-url'])
 				with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
 				break
