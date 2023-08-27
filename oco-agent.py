@@ -911,6 +911,7 @@ def mainloop():
 		'agent_version': AGENT_VERSION,
 		'networks': getNics(),
 		'services': getServiceStatus(),
+		'uptime': getUptime()
 	}
 	request = jsonRequest('oco.agent.hello', data)
 
