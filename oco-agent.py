@@ -679,21 +679,25 @@ def getLogins(since):
 					})
 	elif 'darwin' in OS_TYPE:
 		command = 'last'
+		os.environ['LANG'] = 'C'
 		entries = os.popen(command).read().replace('\t',' ').split('\n')
 		for entry in entries:
 			parts = ' '.join(entry.split()).split(' ', 2)
-			if(len(parts) == 3 and parts[1] != '~' and parts[0] != 'wtmp'):
-				rawTimestamp = ' '.join(parts[2].split(' ', 4)[:-1])
-				dateObject = datetime.datetime.strptime(rawTimestamp, '%a %b %d %H:%M')
-				dateObject = dateObject.replace(tzinfo=tz.tzlocal()) # `last` output is in local time - set TZ info for correct UTC conversion
-				if(dateObject.year == 1900): dateObject = dateObject.replace(year=datetime.date.today().year)
-				if(dateObject <= dateObjectSince): continue
-				users.append({
-					'display_name': os.popen('id -F '+shlex.quote(parts[0])).read().strip(),
-					'username': parts[0],
-					'console': parts[1],
-					'timestamp': dateObject.astimezone(tz.tzutc()).strftime('%Y-%m-%d %H:%M:%S')
-				})
+			if(len(parts) != 3 or parts[1] == '~'): continue
+			if(parts[0] == 'reboot' or parts[0] == 'wtmp'): continue
+			dateTimeParts = parts[2].split(' ', 4)
+			if(len(dateTimeParts) != 5): continue
+			rawTimestamp = ' '.join(dateTimeParts[:-1])
+			dateObject = datetime.datetime.strptime(rawTimestamp, '%a %b %d %H:%M')
+			dateObject = dateObject.replace(tzinfo=tz.tzlocal()) # `last` output is in local time - set TZ info for correct UTC conversion
+			if(dateObject.year == 1900): dateObject = dateObject.replace(year=datetime.date.today().year)
+			if(dateObject <= dateObjectSince): continue
+			users.append({
+				'display_name': os.popen('id -F '+shlex.quote(parts[0])).read().strip(),
+				'username': parts[0],
+				'console': parts[1],
+				'timestamp': dateObject.astimezone(tz.tzutc()).strftime('%Y-%m-%d %H:%M:%S')
+			})
 	return users
 
 def getEvents(log, query, since):
