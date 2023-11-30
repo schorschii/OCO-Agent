@@ -122,8 +122,15 @@ service-wrapper.exe --startup auto install
 service-wrapper.exe start
 ```
 
-## Debugging
-In case of problems, you can debug the agent by manually executing the script or compiled binary in terminal as root/Administrator, so you can check its output. Set the `debug = 1` option in the agent config file for more verbose output.
+## Troubleshooting/Debugging
+In case of problems, you can debug the agent by manually executing the python script or compiled binary in a terminal.
+
+1. Stop the OCO-Agent service if installed.
+2. Open a terminal as root/Administrator and change into the agent program directory.
+3. Start the `oco-agent.exe`/`oco-agent` binary and check its output.
+4. (optional) Set the `debug = 1` option in the `oco-agent.ini` file for more verbose output.
+
+If you can't solve the problem, you can create an issue on Github. Include the output from your terminal.
 
 ## Service Monitoring
 OCO offers basic monitoring features. You can check anything by writing your own service check script and placing it into the agent's local check directory (`/usr/lib/oco-agent/service-checks` on Linux; respectively `service-checks` inside the oco agent directory on Windows and macOS). Your script just have to produce standardised output in the [CheckMK check format](https://docs.checkmk.com/latest/de/localchecks.html).
