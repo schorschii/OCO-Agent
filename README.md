@@ -127,7 +127,7 @@ In case of problems, you can debug the agent by manually executing the python sc
 
 1. Stop the OCO-Agent service if installed.
 2. Open a terminal as root/Administrator and change into the agent program directory.
-3. Start the `oco-agent.exe`/`oco-agent` binary and check its output.
+3. Start the `oco-agent.exe`/`./oco-agent` binary and check its output.
 4. (optional) Set the `debug = 1` option in the `oco-agent.ini` file for more verbose output.
 
 If you can't solve the problem, you can create an issue on Github. Include the output from your terminal.
