@@ -235,9 +235,9 @@ def getUefiOrBios():
 	booted = '?'
 	if 'win32' in OS_TYPE:
 		command = 'bcdedit'
-		res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+		res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
 		if res.returncode == 0:
-			booted = 'UEFI' if 'EFI' in res.stdout else 'Legacy'
+			booted = 'UEFI' if 'EFI' in guessEncodingAndDecode(res.stdout) else 'Legacy'
 	elif 'linux' in OS_TYPE:
 		booted = 'UEFI' if os.path.exists('/sys/firmware/efi') else 'Legacy'
 	elif 'darwin' in OS_TYPE:
