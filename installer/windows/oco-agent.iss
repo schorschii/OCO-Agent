@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "OCO Agent"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Sieber Systems"
 #define MyAppURL "https://github.com/schorschii/OCO-Agent"
 #define MyAppSupportURL "https://sieber.systems/"
