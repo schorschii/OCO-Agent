@@ -7,7 +7,7 @@ TARGET_DIRECTORY="$SCRIPTPATH/target"
 PRODUCT="OCO Agent"
 VERSION="1.0.3"
 TARGET_FILENAME="oco-agent.pkg"
-APPLE_DEVELOPER_CERTIFICATE_ID="Developer ID Installer: Georg Sieber (96G8V7UY3M)"
+DEVELOPER_ID_INSTALLER_CERT="Developer ID Installer: Georg Sieber (96G8V7UY3M)"
 
 
 # create/clean target build directory
@@ -53,15 +53,24 @@ chmod 755 "${TARGET_DIRECTORY}/pkg"
 find "${TARGET_DIRECTORY}" -name ".DS_Store" -delete
 
 
+# sign executable (done by PyInstaller)
+#if [ "$DEVELOPER_ID_INSTALLER_CERT" != "" ]; then
+#	echo "Sign executable ..."
+#	codesign --deep --force --options=runtime --entitlements ./entitlements.plist --sign "$DEVELOPER_ID_INSTALLER_CERT" --timestamp ./target/darwinpkg/opt/oco-agent/oco-agent
+#fi
+
+
 # build packages
 echo "Build application installer package ..."
 pkgbuild --identifier "org.${PRODUCT}.${VERSION}" \
 	--version "${VERSION}" \
 	--scripts "${TARGET_DIRECTORY}/darwin/scripts" \
 	--root "${TARGET_DIRECTORY}/darwinpkg" \
+	${DEVELOPER_ID_INSTALLER_CERT:+"--sign" "$DEVELOPER_ID_INSTALLER_CERT"} \
 	"${TARGET_DIRECTORY}/package/$TARGET_FILENAME"
 
 
+# build application installer
 echo "Build application installer product ..."
 productbuild --distribution "${TARGET_DIRECTORY}/darwin/Distribution" \
 	--resources "${TARGET_DIRECTORY}/darwin/Resources" \
@@ -69,13 +78,13 @@ productbuild --distribution "${TARGET_DIRECTORY}/darwin/Distribution" \
 	"${TARGET_DIRECTORY}/pkg/$TARGET_FILENAME"
 
 
-# sign packages
-if [ "$APPLE_DEVELOPER_CERTIFICATE_ID" != "" ]; then
+# sign outer package
+if [ "$DEVELOPER_ID_INSTALLER_CERT" != "" ]; then
 	echo "Sign application installer ..."
 	mkdir -pv "${TARGET_DIRECTORY}/pkg-signed"
 	chmod 755 "${TARGET_DIRECTORY}/pkg-signed"
 
-	productsign --sign "${APPLE_DEVELOPER_CERTIFICATE_ID}" \
+	productsign --sign "${DEVELOPER_ID_INSTALLER_CERT}" \
 		"${TARGET_DIRECTORY}/pkg/$TARGET_FILENAME" \
 		"${TARGET_DIRECTORY}/pkg-signed/$TARGET_FILENAME"
 
@@ -85,6 +94,19 @@ fi
 
 # cleanup
 rm -rf "${TARGET_DIRECTORY}/package"
+
+
+# notarize (only possible with valid signature)
+if [ "$DEVELOPER_ID_INSTALLER_CERT" != "" ]; then
+	# preparation for this step:
+	# xcrun notarytool store-credentials "notarytool-password" --apple-id "..." --team-id ...
+
+	echo "Notarize application installer ..."
+	xcrun notarytool submit "${TARGET_DIRECTORY}/pkg-signed/oco-agent.pkg" --wait --keychain-profile "notarytool-password"
+
+	# get logfile with additional information:
+	# xcrun notarytool log --keychain-profile "notarytool-password" xxx-xxx-xxx-xxx developer_log.json
+fi
 
 
 echo "Build finished"

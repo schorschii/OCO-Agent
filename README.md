@@ -99,7 +99,8 @@ systemctl start oco-agent
 ```
 pip install dnspython requests netifaces psutil distro python-dateutil pyedid pip-system-certs
 
-pyinstaller -F oco-agent.py
+security find-identity -v -p codesigning # get SHA-1 hash of you Developer ID Application certificate for signing (optional)
+pyinstaller -F oco-agent.py [--codesign-identity=<SHA-1-HASH>]
 
 # move compiled binary `oco-agent` to `/opt/oco-agent/oco-agent`
 # copy `oco-agent.example.ini` to `/opt/oco-agent/oco-agent.ini` and enter your server details
