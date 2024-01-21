@@ -53,7 +53,7 @@ OS_TYPE = sys.platform.lower()
 
 if 'win32' in OS_TYPE:
 	import wmi, winreg
-	from winevt import EventLog
+	from winevt_ng import EventLog
 	from win32com.client import GetObject
 elif 'linux' in OS_TYPE:
 	import utmp
