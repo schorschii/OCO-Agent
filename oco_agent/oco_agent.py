@@ -1083,57 +1083,60 @@ def mainloop():
 				request = jsonRequest('oco.agent.events', {'events':events})
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
+def main():
+	try:
+		# read arguments
+		parser = argparse.ArgumentParser(add_help=False)
+		parser.add_argument('--config', default=DEFAULT_CONFIG_PATH, type=str)
+		parser.add_argument('--daemon', action='store_true')
+		args = parser.parse_args()
+		configFilePath = args.config
+		daemonMode = args.daemon
+		print(logtime()+'OCO Agent starting with config file: '+configFilePath+' ...')
 
-try:
-	# read arguments
-	parser = argparse.ArgumentParser(add_help=False)
-	parser.add_argument('--config', default=DEFAULT_CONFIG_PATH, type=str)
-	parser.add_argument('--daemon', action='store_true')
-	args = parser.parse_args()
-	configFilePath = args.config
-	daemonMode = args.daemon
-	print(logtime()+'OCO Agent starting with config file: '+configFilePath+' ...')
+		# read config
+		configParser = configparser.RawConfigParser()
+		configParser.read(configFilePath)
+		if(configParser.has_option('agent', 'debug')): config['debug'] = (int(configParser.get('agent', 'debug')) == 1)
+		if(configParser.has_option('agent', 'hostname-remove-domain')): config['hostname-remove-domain'] = (int(configParser.get('agent', 'hostname-remove-domain')) == 1)
+		if(configParser.has_option('agent', 'connection-timeout')): config['connection-timeout'] = int(configParser.get('agent', 'connection-timeout'))
+		if(configParser.has_option('agent', 'read-timeout')): config['read-timeout'] = int(configParser.get('agent', 'read-timeout'))
+		if(configParser.has_option('agent', 'query-interval')): config['query-interval'] = int(configParser.get('agent', 'query-interval'))
+		if(configParser.has_option('agent', 'agent-key')): config['agent-key'] = configParser.get('agent', 'agent-key')
+		if(configParser.has_option('server', 'api-url')): config['api-url'] = configParser.get('server', 'api-url')
+		if(configParser.has_option('server', 'server-key')): config['server-key'] = configParser.get('server', 'server-key')
+		if(configParser.has_option('windows', 'username-with-domain')): config['windows']['username-with-domain'] = (int(configParser.get('windows', 'username-with-domain')) == 1)
 
-	# read config
-	configParser = configparser.RawConfigParser()
-	configParser.read(configFilePath)
-	if(configParser.has_option('agent', 'debug')): config['debug'] = (int(configParser.get('agent', 'debug')) == 1)
-	if(configParser.has_option('agent', 'hostname-remove-domain')): config['hostname-remove-domain'] = (int(configParser.get('agent', 'hostname-remove-domain')) == 1)
-	if(configParser.has_option('agent', 'connection-timeout')): config['connection-timeout'] = int(configParser.get('agent', 'connection-timeout'))
-	if(configParser.has_option('agent', 'read-timeout')): config['read-timeout'] = int(configParser.get('agent', 'read-timeout'))
-	if(configParser.has_option('agent', 'query-interval')): config['query-interval'] = int(configParser.get('agent', 'query-interval'))
-	if(configParser.has_option('agent', 'agent-key')): config['agent-key'] = configParser.get('agent', 'agent-key')
-	if(configParser.has_option('server', 'api-url')): config['api-url'] = configParser.get('server', 'api-url')
-	if(configParser.has_option('server', 'server-key')): config['server-key'] = configParser.get('server', 'server-key')
-	if(configParser.has_option('windows', 'username-with-domain')): config['windows']['username-with-domain'] = (int(configParser.get('windows', 'username-with-domain')) == 1)
+		# try server auto discovery
+		if(config['api-url'].strip() == ''):
+			print(logtime()+'Server API URL is empty - trying DNS auto discovery ...')
+			try:
+				res = resolver.resolve(qname='_oco._tcp', rdtype=rdatatype.SRV, lifetime=10, search=True)
+				for srv in res.rrset:
+					config['api-url'] = 'https://'+str(srv.target)+':'+str(srv.port)+'/api-agent.php'
+					print(logtime()+'DNS auto discovery found server: '+config['api-url'])
+					if(not configParser.has_section('server')): configParser.add_section('server')
+					configParser.set('server', 'api-url', config['api-url'])
+					with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
+					break
+			except Exception as e: print(logtime()+'DNS auto discovery failed: '+str(e))
 
-	# try server auto discovery
-	if(config['api-url'].strip() == ''):
-		print(logtime()+'Server API URL is empty - trying DNS auto discovery ...')
-		try:
-			res = resolver.resolve(qname='_oco._tcp', rdtype=rdatatype.SRV, lifetime=10, search=True)
-			for srv in res.rrset:
-				config['api-url'] = 'https://'+str(srv.target)+':'+str(srv.port)+'/api-agent.php'
-				print(logtime()+'DNS auto discovery found server: '+config['api-url'])
-				if(not configParser.has_section('server')): configParser.add_section('server')
-				configParser.set('server', 'api-url', config['api-url'])
-				with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
-				break
-		except Exception as e: print(logtime()+'DNS auto discovery failed: '+str(e))
-
-except Exception as e:
-	print(logtime()+str(e))
-	sys.exit(1)
-
-# execute the agent as daemon if requested
-if(daemonMode == True):
-	lockCheck()
-	daemon()
-
-# execute the agent once
-else:
-	lockCheck()
-	try: mainloop()
-	except KeyError as e:
-		print(logtime()+'KeyError: '+str(e))
+	except Exception as e:
+		print(logtime()+str(e))
 		sys.exit(1)
+
+	# execute the agent as daemon if requested
+	if(daemonMode == True):
+		lockCheck()
+		daemon()
+
+	# execute the agent once
+	else:
+		lockCheck()
+		try: mainloop()
+		except KeyError as e:
+			print(logtime()+'KeyError: '+str(e))
+			sys.exit(1)
+
+if __name__ == '__main__':
+	main()

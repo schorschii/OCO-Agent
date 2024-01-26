@@ -4,9 +4,12 @@ import subprocess, time, os, sys, signal, win32serviceutil, win32service, win32e
 # OCO Agent: Service Wrapper for Windows
 
 class OcoWinService(win32serviceutil.ServiceFramework):
-	_svc_name_ = "oco-agent"
-	_svc_display_name_ = "OCO Agent"
-	_svc_description_ = "Open Computer Orchestration Agent for Windows (c) Georg Sieber 2020-2022"
+	_svc_name_         = 'oco-agent'
+	_svc_display_name_ = 'OCO Agent'
+	_svc_description_  = 'Open Computer Orchestration Agent for Windows (c) Georg Sieber 2020-2024'
+
+	agent_bin = 'C:/Program Files/OCO Agent/oco-agent.exe'
+	agent_ini = 'C:/Program Files/OCO Agent/oco-agent.ini'
 
 	runflag = True
 	process = None
@@ -42,8 +45,7 @@ class OcoWinService(win32serviceutil.ServiceFramework):
 
 	def start(self):
 		self.process = subprocess.Popen([
-			"C:/Program Files/OCO Agent/oco-agent.exe", "--daemon",
-			"--config=C:/Program Files/OCO Agent/oco-agent.ini"
+			self.agent_bin, '--daemon', '--config='+self.agent_ini
 		])
 
 	def main(self):
@@ -52,9 +54,9 @@ class OcoWinService(win32serviceutil.ServiceFramework):
 			if(self.runflag):
 				try:
 					if(self.process.poll() is None):
-						self.log("Service running...")
+						self.log('Service running...')
 					else:
-						self.log("Child died! Restart...")
+						self.log('Child died! Restart...')
 						self.start()
 				except Exception as e:
 					self.log(str(e))
@@ -71,10 +73,13 @@ class OcoWinService(win32serviceutil.ServiceFramework):
 
 			time.sleep(1)
 
-if __name__ == '__main__':
+def main():
 	if len(sys.argv) == 1:
 		servicemanager.Initialize()
 		servicemanager.PrepareToHostSingle(OcoWinService)
 		servicemanager.StartServiceCtrlDispatcher()
 	else:
 		win32serviceutil.HandleCommandLine(OcoWinService)
+
+if __name__ == '__main__':
+	main()

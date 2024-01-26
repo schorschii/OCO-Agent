@@ -1,0 +1,16 @@
+dnspython
+requests
+netifaces
+psutil
+distro
+python-dateutil
+pyedid
+pip-system-certs
+
+# Linux specific
+utmp; sys_platform == "linux"
+
+# Windows specific
+wmi; sys_platform == "win32"
+pywin32; sys_platform == "win32"
+winevt_ng; sys_platform == "win32"

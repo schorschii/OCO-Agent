@@ -2,7 +2,11 @@
 
 oco-agent.ini
 
+oco-agent/
+
 __pycache__/
+
+oco_agent.egg-info/
 
 build/
 dist/

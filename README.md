@@ -81,13 +81,16 @@ This is how you manually install the agent.
 Please do not forget to adjust the config file to point to your OCO server and set the correct agent key (defined on the server's web frontend). Set appropriate permissions to only allow root/Administrator to read the file content in order to protect the agent key.
 
 ### Linux (Systemd)
-No compilation needed, just install all dependencies and oco-agent.service file for systemd.
 ```
-apt install python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil mokutil
-sudo -H pip3 install pyedid  # pyedid is not available in Ubuntu/Debian repos
-sudo -H pip3 install utmp  # Linux specific modules
+# install available python modules globally to avoid duplicate install in venv
+apt install python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv mokutil
 
-# copy `oco-agent.py` to `/usr/bin/oco-agent` and make it executable
+python3 -m venv oco-agent
+oco-agent/bin/pip3 install pyinstaller .
+
+oco-agent/bin/pyinstaller oco-agent.linux.spec
+
+# copy `dist/oco-agent` to `/usr/share/oco-agent`
 # copy `oco-agent.example.ini` to `/etc/oco-agent.ini` and enter your server details
 # copy `oco-agent.service` to `/etc/systemd/system/oco-agent.service`
 
@@ -97,10 +100,10 @@ systemctl start oco-agent
 
 ### macOS
 ```
-pip install dnspython requests netifaces psutil distro python-dateutil pyedid pip-system-certs
+python3 -m venv oco-agent
+oco-agent/bin/pip3 install pyinstaller .
 
-security find-identity -v -p codesigning # get SHA-1 hash of you Developer ID Application certificate for signing (optional)
-pyinstaller -F oco-agent.py [--codesign-identity=<SHA-1-HASH>]
+pyinstaller oco-agent.macos.spec
 
 # move compiled binary `oco-agent` to `/opt/oco-agent/oco-agent`
 # copy `oco-agent.example.ini` to `/opt/oco-agent/oco-agent.ini` and enter your server details
@@ -112,17 +115,16 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 
 ### Windows
 ```
-pip install dnspython requests netifaces psutil distro python-dateutil pyedid pip-system-certs
-pip install wmi pywin32 winevt_ng  # Windows specific modules
+python -m venv oco-agent
+oco-agent\Scripts\pip3 install pyinstaller .
 
-pyinstaller oco-agent-windows.spec
+oco-agent\Scripts\pyinstaller oco-agent.windows.spec
 
-# move compiled `service-wrapper.exe` files to: `C:\Program Files\OCO Agent\service-wrapper.exe`
-# move compiled `oco-agent.exe` files to: `C:\Program Files\OCO Agent\oco-agent.exe`
+# copy `dist/oco-agent` to `C:\Program Files\OCO Agent`
 # copy `oco-agent.example.ini` to `C:\Program Files\OCO Agent` and enter your server details
 
-service-wrapper.exe --startup auto install
-service-wrapper.exe start
+"C:\Program Files\OCO Agent\service-wrapper.exe" --startup auto install
+"C:\Program Files\OCO Agent\service-wrapper.exe" start
 ```
 
 ## Troubleshooting/Debugging
