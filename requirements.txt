@@ -1,11 +1,11 @@
-dnspython
-requests
-netifaces
-psutil
-distro
-python-dateutil
-pyedid
-pip-system-certs
+dnspython==2.6.1
+requests==2.31.0
+netifaces==0.11.0
+psutil==5.9.8
+distro==1.9.0
+python-dateutil==2.9.0.post0
+pyedid==1.0.3
+pip-system-certs==4.0
 
 # Linux specific
 utmp; sys_platform == "linux"
