@@ -67,22 +67,25 @@ elif 'darwin' in OS_TYPE:
 
 restartFlag = False
 config = {
+	# Agent config
 	'debug': False,
 	'connection-timeout': 3.05,
 	'read-timeout': 150,
 	'query-interval': 60,
 	'agent-key': '',
-	'api-url': '',
-	'server-key': '',
 	'chunk-size': 8192, # download chunk size
 	'report-frames': 8192, # report download progress every 64 MiB
 	'report-job-output': 5, # report job output every x secs if new lines appeared
 	'hostname-remove-domain': True,
+	# Platform specific agent config
 	'linux': {},
 	'macos': {},
 	'windows': {
 		'username-with-domain': False
-	}
+	},
+	# Server config
+	'api-url': '',
+	'server-key': '',
 }
 
 
@@ -1157,15 +1160,21 @@ def main():
 		# read config
 		configParser = configparser.RawConfigParser()
 		configParser.read(configFilePath)
-		if(configParser.has_option('agent', 'debug')): config['debug'] = (int(configParser.get('agent', 'debug')) == 1)
-		if(configParser.has_option('agent', 'hostname-remove-domain')): config['hostname-remove-domain'] = (int(configParser.get('agent', 'hostname-remove-domain')) == 1)
-		if(configParser.has_option('agent', 'connection-timeout')): config['connection-timeout'] = int(configParser.get('agent', 'connection-timeout'))
-		if(configParser.has_option('agent', 'read-timeout')): config['read-timeout'] = int(configParser.get('agent', 'read-timeout'))
-		if(configParser.has_option('agent', 'query-interval')): config['query-interval'] = int(configParser.get('agent', 'query-interval'))
-		if(configParser.has_option('agent', 'agent-key')): config['agent-key'] = configParser.get('agent', 'agent-key')
-		if(configParser.has_option('server', 'api-url')): config['api-url'] = configParser.get('server', 'api-url')
-		if(configParser.has_option('server', 'server-key')): config['server-key'] = configParser.get('server', 'server-key')
-		if(configParser.has_option('windows', 'username-with-domain')): config['windows']['username-with-domain'] = (int(configParser.get('windows', 'username-with-domain')) == 1)
+		if(configParser.has_section('agent')):
+			config['debug'] = (int(configParser['agent'].get('debug', config['debug'])) == 1)
+			config['hostname-remove-domain'] = (int(configParser['agent'].get('hostname-remove-domain', config['hostname-remove-domain'])) == 1)
+			config['connection-timeout'] = int(configParser['agent'].get('connection-timeout', config['connection-timeout']))
+			config['read-timeout'] = int(configParser['agent'].get('read-timeout', config['read-timeout']))
+			config['query-interval'] = int(configParser['agent'].get('query-interval', config['query-interval']))
+			config['chunk-size'] = int(configParser['agent'].get('chunk-size', config['chunk-size']))
+			config['report-frames'] = int(configParser['agent'].get('report-frames', config['report-frames']))
+			config['report-job-output'] = int(configParser['agent'].get('report-job-output', config['report-job-output']))
+			config['agent-key'] = configParser['agent'].get('agent-key', config['agent-key'])
+		if(configParser.has_section('server')):
+			config['api-url'] = configParser['server'].get('api-url', config['api-url'])
+			config['server-key'] = configParser['server'].get('server-key', config['server-key'])
+		if(configParser.has_section('windows')):
+			config['windows']['username-with-domain'] = (int(configParser['windows'].get('username-with-domain', config['windows']['username-with-domain'])) == 1)
 
 		# try server auto discovery
 		if(config['api-url'].strip() == ''):
