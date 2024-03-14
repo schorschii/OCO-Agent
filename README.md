@@ -85,10 +85,11 @@ Please do not forget to adjust the config file to point to your OCO server and s
 # install available python modules globally to avoid duplicate install in venv
 apt install python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv mokutil
 
-python3 -m venv oco-agent
-oco-agent/bin/pip3 install pyinstaller .
+# using system site packages is important for the systemd journalctl module
+python3 -m venv venv --system-site-packages
+venv/bin/pip3 install pyinstaller .
 
-oco-agent/bin/pyinstaller oco-agent.linux.spec
+venv/bin/pyinstaller oco-agent.linux.spec
 
 # copy `dist/oco-agent` to `/usr/share/oco-agent`
 # copy `oco-agent.example.ini` to `/etc/oco-agent.ini` and enter your server details
@@ -100,8 +101,8 @@ systemctl start oco-agent
 
 ### macOS
 ```
-python3 -m venv oco-agent
-oco-agent/bin/pip3 install pyinstaller .
+python3 -m venv venv
+venv/bin/pip3 install pyinstaller .
 
 pyinstaller oco-agent.macos.spec
 
@@ -115,10 +116,10 @@ sudo launchctl start /Library/LaunchDaemons/systems.sieber.oco-agent.plist
 
 ### Windows
 ```
-python -m venv oco-agent
-oco-agent\Scripts\pip3 install pyinstaller .
+python -m venv venv
+venv\Scripts\pip3 install pyinstaller .
 
-oco-agent\Scripts\pyinstaller oco-agent.windows.spec
+venv\Scripts\pyinstaller oco-agent.windows.spec
 
 # copy `dist/oco-agent` to `C:\Program Files\OCO Agent`
 # copy `oco-agent.example.ini` to `C:\Program Files\OCO Agent` and enter your server details

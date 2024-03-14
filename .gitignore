@@ -2,7 +2,7 @@
 
 oco-agent.ini
 
-oco-agent/
+venv/
 
 __pycache__/
 
