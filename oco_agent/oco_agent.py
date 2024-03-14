@@ -15,6 +15,7 @@ try:
 	import pip_system_certs.wrapt_requests
 except ImportError: pass
 
+import threading
 import requests
 import json
 import socket
@@ -73,6 +74,9 @@ config = {
 	'agent-key': '',
 	'api-url': '',
 	'server-key': '',
+	'chunk-size': 8192, # download chunk size
+	'report-frames': 8192, # report download progress every 64 MiB
+	'report-job-output': 5, # report job output every x secs if new lines appeared
 	'hostname-remove-domain': True,
 	'linux': {},
 	'macos': {},
@@ -778,13 +782,33 @@ def getServiceStatus():
 
 
 ##### AGENT-SERVER COMMUNICATION FUNCTIONS #####
+JOB_STATE_ERROR       = -1
+JOB_STATE_DOWNLOADING = 1
+JOB_STATE_EXECUTING   = 2
+JOB_STATE_FINISHED    = 3
 
-def downloadFile(url, params, path):
+def downloadFile(url, params, path, jobId):
 	with requests.get(url, params=params, stream=True, timeout=(config['connection-timeout'],config['read-timeout'])) as r:
 		r.raise_for_status()
+		totalLength = r.headers.get('content-length')
+		if(totalLength): totalLength = int(totalLength)
 		with open(path, 'wb') as f:
-			for chunk in r.iter_content(chunk_size=8192): 
+			bytesWritten = 0
+			reportCounter = 0
+			for chunk in r.iter_content(chunk_size=config['chunk-size']): 
 				f.write(chunk)
+				bytesWritten += config['chunk-size']
+				if(totalLength):
+					reportCounter += 1
+					if(reportCounter > config['report-frames']):
+						reportCounter = 0
+						jsonRequest('oco.agent.update_job_state', {
+							'job-id': jobId,
+							'state': JOB_STATE_DOWNLOADING,
+							'return-code': None,
+							'download-progress': 100 * bytesWritten / totalLength,
+							'message': ''
+						})
 
 def jsonRequest(method, data):
 	headers = {'content-type': 'application/json'}
@@ -854,6 +878,21 @@ def guessEncodingAndDecode(textBytes, codecs=['utf-8', 'cp1252', 'cp850']):
 		except UnicodeDecodeError: pass
 	return textBytes.decode(sys.stdout.encoding, 'replace') # fallback: replace invalid characters
 
+def jobOutputReporter(jobId):
+	delay = config['report-job-output']
+	if(not delay): return # no periodical reporting
+	lastOutput = b''
+	currentThread = threading.currentThread()
+	currentThread.endEvent.wait(delay)
+	while not currentThread.endEvent.is_set():
+		currentOutput = getattr(currentThread, 'output', b'')
+		if(lastOutput != currentOutput):
+			jsonRequest('oco.agent.update_job_state', {
+					'job-id': jobId, 'state': JOB_STATE_EXECUTING, 'return-code': None, 'message': guessEncodingAndDecode(currentOutput)
+				})
+		lastOutput = currentOutput
+		currentThread.endEvent.wait(delay)
+
 # function for checking if agent is already running (e.g. due to long running software jobs)
 def lockCheck():
 	try:
@@ -911,13 +950,12 @@ def mainloop():
 
 	# send initial request
 	print(logtime()+'Sending agent_hello...')
-	data = {
+	request = jsonRequest('oco.agent.hello', {
 		'agent_version': AGENT_VERSION,
 		'networks': getNics(),
 		'services': getServiceStatus(),
 		'uptime': getUptime()
-	}
-	request = jsonRequest('oco.agent.hello', data)
+	})
 
 	# check response
 	if(request != None and request.status_code == 200):
@@ -950,7 +988,7 @@ def mainloop():
 			loginsSince = responseJson['result']['params']['logins-since']
 		if(responseJson['result']['params']['update'] == 1):
 			print(logtime()+'Updating inventory data...')
-			data = {
+			jsonRequest('oco.agent.update', {
 				'hostname': getHostname(),
 				'agent_version': AGENT_VERSION,
 				'os': getOs(),
@@ -976,8 +1014,7 @@ def mainloop():
 				'partitions': getPartitions(),
 				'software': getInstalledSoftware(),
 				'logins': getLogins(loginsSince)
-			}
-			request = jsonRequest('oco.agent.update', data)
+			})
 
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
@@ -988,7 +1025,9 @@ def mainloop():
 					continue
 				if(job['procedure'].strip() == ''):
 					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
-					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 3, 'return-code': 0, 'message': ''})
+					jsonRequest('oco.agent.update_job_state', {
+						'job-id': job['id'], 'state': JOB_STATE_FINISHED, 'return-code': 0, 'message': ''
+					})
 					continue
 				if(restartFlag == True):
 					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
@@ -1005,19 +1044,38 @@ def mainloop():
 
 					# download if needed
 					if(job['download'] == True):
-						jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 1, 'return-code': 0, 'message': ''})
-
-						payloadparams = { 'uid': getMachineUid(), 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id'] }
-						downloadFile(config['api-url'], payloadparams, tempZipPath)
-
+						jsonRequest('oco.agent.update_job_state', {
+							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 0, 'message': ''
+						})
+						downloadFile(
+							config['api-url'],
+							{'uid': getMachineUid(), 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id']},
+							tempZipPath,
+							job['id']
+						)
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							zipObj.extractall(tempPath)
 
 					# change to tmp dir and execute procedure
-					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 2, 'return-code': 0, 'message': ''})
+					jsonRequest('oco.agent.update_job_state', {
+						'job-id': job['id'], 'state': JOB_STATE_EXECUTING, 'return-code': None, 'download-progress': 100, 'message': ''
+					})
 					os.chdir(tempPath)
-					res = subprocess.run(job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-					jobStatusRequest = jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': 3, 'return-code': res.returncode, 'message': guessEncodingAndDecode(res.stdout)})
+					proc = subprocess.Popen(
+						job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL
+					)
+					jobOutputReportThread = threading.Thread(target=jobOutputReporter, args=(job['id'],))
+					jobOutputReportThread.endEvent = threading.Event()
+					jobOutputReportThread.start()
+					outBuffer = b''
+					for line in iter(proc.stdout.readline, b''):
+						outBuffer += line
+						jobOutputReportThread.output = outBuffer
+					proc.stdout.close()
+					jobStatusRequest = jsonRequest('oco.agent.update_job_state', {
+						'job-id': job['id'], 'state': JOB_STATE_FINISHED, 'return-code': proc.wait(), 'message': guessEncodingAndDecode(outBuffer)
+					})
+					jobOutputReportThread.endEvent.set()
 
 					# check server's update_job_state response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
@@ -1070,7 +1128,9 @@ def mainloop():
 
 				except Exception as e:
 					print(logtime()+str(e))
-					jsonRequest('oco.agent.update_job_state', {'job-id': job['id'], 'state': -1, 'return-code': -9999, 'message': str(e)})
+					jsonRequest('oco.agent.update_job_state', {
+						'job-id': job['id'], 'state': JOB_STATE_ERROR, 'return-code': -9999, 'message': str(e)
+					})
 					os.chdir(tempfile.gettempdir())
 
 		# send events from logs if requested
@@ -1080,7 +1140,7 @@ def mainloop():
 				if not 'log' in eventQuery or not 'query' in eventQuery or not 'since' in eventQuery: continue
 				events += getEvents(eventQuery['log'], eventQuery['query'], eventQuery['since'])
 			if(len(events) > 0):
-				request = jsonRequest('oco.agent.events', {'events':events})
+				jsonRequest('oco.agent.events', {'events':events})
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 def main():
