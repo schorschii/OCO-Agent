@@ -5,9 +5,8 @@ The Open Computer Orchestration (OCO) project enables IT administrators to centr
 
 It focuses on easy usability (UI/UX), simplicity (assessable code with minimal external dependencies) and performance (you can manage many computers with minimal server resources).
 
-- [OCO Server](https://github.com/schorschii/oco-server)
-- [OCO Server Extensions](https://github.com/schorschii/oco-server-extensions)
-- [OCO Agent](https://github.com/schorschii/oco-agent)
+| [OCO Server](https://github.com/schorschii/oco-server) | [OCO Server Extensions](https://github.com/schorschii/oco-server-extensions) | [OCO Agent](https://github.com/schorschii/oco-agent) |
+| --- | --- | --- |
 
 ## About OCO Agent
 The OCO agent needs to be installed on every client which should be managed with the OCO server. It periodically contacts the server to sync the inventory data and execute pending software jobs. This means that no additional port has to be opened - the client initiates the connection to the server. The agent can manage Linux, Windows and macOS machines.
