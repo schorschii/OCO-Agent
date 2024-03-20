@@ -1056,6 +1056,9 @@ def mainloop():
 							tempZipPath,
 							job['id']
 						)
+						jsonRequest('oco.agent.update_job_state', {
+							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 101, 'message': ''
+						})
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							zipObj.extractall(tempPath)
 
