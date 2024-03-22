@@ -37,7 +37,7 @@ chmod 774 $BUILDDIR/$INSTALLDIR/oco-agent
 
 # make binary available in PATH
 sudo mkdir -p $BUILDDIR/usr/bin
-sudo ln -sf   $INSTALLDIR/venv/bin/oco-agent     $BUILDDIR/usr/bin/oco-agent
+sudo ln -sf   $INSTALLDIR/oco-agent     $BUILDDIR/usr/bin/oco-agent
 
 # build deb
 sudo dpkg-deb -Zxz --build oco-agent
