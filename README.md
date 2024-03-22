@@ -108,7 +108,7 @@ systemctl start oco-agent
 python3 -m venv venv
 venv/bin/pip3 install pyinstaller .
 
-pyinstaller oco-agent.macos.spec
+venv/bin/pyinstaller oco-agent.macos.spec
 
 # move compiled binary `oco-agent` to `/opt/oco-agent/oco-agent`
 # copy `oco-agent.example.ini` to `/opt/oco-agent/oco-agent.ini` and enter your server details
