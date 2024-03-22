@@ -18,10 +18,11 @@ The OCO agent needs to be installed on every client which should be managed with
 ## System Requirements
 ### Agent
 - 🐧 official supported Linux systems (`.deb` package provided)
+  - Debian 10, 11, 12
   - Ubuntu 18.04, 20.04, 21.04, 22.04
   - derived distros like Linux Mint 19, 20, 21 etc. with systemd (sysvinit is not supported by the official `.deb` package)
 - 🐧 other Linux Systems will most likely work as well but may require manual agent and dependency installation
-- 🍏 macOS 10.15, 11 and 12 (`.pkg` package provided)
+- 🍏 macOS 11, 12, 13 and 14 (`.pkg` package provided)
 - 🪟 Windows 7, 8(.1), 10 and 11 (`.exe` setup provided)
   <details>
   <summary>Windows 11 hint</summary>
@@ -107,7 +108,7 @@ systemctl start oco-agent
 python3 -m venv venv
 venv/bin/pip3 install pyinstaller .
 
-pyinstaller oco-agent.macos.spec
+venv/bin/pyinstaller oco-agent.macos.spec
 
 # move compiled binary `oco-agent` to `/opt/oco-agent/oco-agent`
 # copy `oco-agent.example.ini` to `/opt/oco-agent/oco-agent.ini` and enter your server details

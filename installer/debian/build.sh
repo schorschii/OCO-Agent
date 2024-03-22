@@ -2,33 +2,44 @@
 set -e
 
 # build .deb package
+INSTALLDIR=/usr/share/oco-agent
+BUILDDIR=oco-agent
 
 # check root permissions
 if [ "$EUID" -ne 0 ]
 	then echo "Please run this script as root!"
-	exit
+	#exit 1 # disabled for github workflow. don't know why this check fails here but sudo works.
 fi
 
 # cd to working dir
 cd "$(dirname "$0")"
 
-# create necessary directories
-mkdir -p oco-agent/etc/systemd/system
-mkdir -p oco-agent/usr/share
-mkdir -p oco-agent/lib/oco-agent/service-checks
+# empty / create necessary directories
+if [ -d "$BUILDDIR/usr" ]; then
+    sudo rm -r $BUILDDIR/usr
+fi
+if [ -d "$BUILDDIR/lib" ]; then
+    sudo rm -r $BUILDDIR/lib
+fi
+if [ -d "$BUILDDIR/etc" ]; then
+    sudo rm -r $BUILDDIR/etc
+fi
+mkdir -p $BUILDDIR/usr/share
+mkdir -p $BUILDDIR/lib/oco-agent/service-checks
 
 # copy files in place
-rm -r oco-agent/usr/share/oco-agent 2>/dev/null || true
-cp -r ../../dist/oco-agent oco-agent/usr/share/oco-agent
-cp ../../oco-agent.dist.ini oco-agent/etc/oco-agent.ini
-cp ../../oco-agent.service oco-agent/etc/systemd/system/oco-agent.service
+cp -r                  ../../dist/oco-agent        $BUILDDIR/$INSTALLDIR
+sudo install -D -m 660 ../../oco-agent.dist.ini    $BUILDDIR/etc/oco-agent.ini
+sudo install -D -m 644 ../../oco-agent.service  -t $BUILDDIR/etc/systemd/system/
 
 # set file permissions
-chown -R root:root oco-agent
-chmod 774 oco-agent/usr/share/oco-agent/oco-agent
-chmod 660 oco-agent/etc/oco-agent.ini
+chmod 774 $BUILDDIR/$INSTALLDIR/oco-agent
+
+# make binary available in PATH
+sudo mkdir -p $BUILDDIR/usr/bin
+sudo ln -sf   $INSTALLDIR/venv/bin/oco-agent     $BUILDDIR/usr/bin/oco-agent
 
 # build deb
-dpkg-deb -Zxz --build oco-agent
+sudo dpkg-deb -Zxz --build oco-agent
 
 echo "Build finished"

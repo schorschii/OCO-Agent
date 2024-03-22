@@ -1,0 +1,180 @@
+name: Release with packages
+
+on:
+  workflow_dispatch: # allow manual execution
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create_release_deb: # name used to identify the output in other jobs
+    name: Create Release with Debian package
+    runs-on: ubuntu-22.04
+
+    permissions:
+      contents: write
+
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Debian packages
+        run: |
+          sudo apt install -y python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv python3-systemd mokutil
+
+      - name: Create venv
+        run: python3 -m venv venv --system-site-packages
+
+      - name: Install Python packages
+        run: venv/bin/pip3 install pyinstaller .
+
+      - name: Compile binaries
+        run: venv/bin/pyinstaller oco-agent.linux.spec
+
+      - name: Execute package build
+        run: cd installer/debian/ && ./build.sh
+
+      - name: Get version name for Github release title
+        run: echo "VERSION=Version $(python3 -c 'import oco_agent; print(oco_agent.__version__)')" >> $GITHUB_ENV
+
+      - id: create_release
+        name: Create Github release
+        uses: actions/create-release@v1
+        env:
+          # this token is provided automatically by Actions with permissions declared above
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: true # create a release draft - only the master of disaster is allowed to publish it
+          prerelease: false
+          release_name: ${{ env.VERSION }}
+          tag_name: ${{ github.ref }}
+
+      - name: Get artifact
+        run: |
+          echo "ARTIFACT_PATH=$(find installer/ -name "*.deb")" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=$(basename $(find installer/ -name "*.deb") .deb)" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.ARTIFACT_PATH }}
+          asset_name: ${{ env.ARTIFACT_NAME }}.deb
+          asset_content_type: application/vnd.debian.binary-package
+
+  create_pkg:
+    name: Create macOS package
+    runs-on: macos-13
+    needs: create_release_deb
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Create venv
+        run: python -m venv venv
+
+      - name: Install Python packages
+        run: venv/bin/pip3 install pyinstaller .
+
+      - name: Importing signing certificates
+        run: |
+          # create and unlock temporary keychain
+          KEYCHAIN_NAME=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASS=$(head -c 8 /dev/urandom | od -An -tu8 | awk '{$1=$1};1')
+          security create-keychain -p $KEYCHAIN_PASS $KEYCHAIN_NAME
+          security default-keychain -s $KEYCHAIN_NAME
+          security set-keychain-settings -lut 21600 $KEYCHAIN_NAME
+          security unlock-keychain -p $KEYCHAIN_PASS $KEYCHAIN_NAME
+
+          # add certificate to keychain
+          CERT_FILE=build.p12
+          echo "${{ secrets.DEVELOPER_ID_APPLICATION_CERT_BASE64 }}" | base64 --decode > $CERT_FILE
+          security import $CERT_FILE -k $KEYCHAIN_NAME -P "${{ secrets.DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}" -T /usr/bin/codesign >/dev/null 2>&1
+          echo "${{ secrets.DEVELOPER_ID_INSTALLER_CERT_BASE64 }}" | base64 --decode > $CERT_FILE
+          security import $CERT_FILE -k $KEYCHAIN_NAME -P "${{ secrets.DEVELOPER_ID_INSTALLER_CERT_PASSWORD }}" -T /usr/bin/pkgbuild -T /usr/bin/productsign >/dev/null 2>&1
+          rm -fr $CERT_FILE
+          #security find-identity -v  #-p codesigning
+
+          # enable codesigning from a non user interactive shell
+          security set-key-partition-list -S apple-tool:,apple: -s -k $KEYCHAIN_PASS $KEYCHAIN_NAME >/dev/null 2>&1
+
+      - name: Compile binaries
+        run: venv/bin/pyinstaller oco-agent.macos.spec
+
+      - name: Execute package build
+        run: cd installer/macos/ && ./build.sh
+        env:
+          DEVELOPER_ID_INSTALLER_CERT_BASE64: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_BASE64 }}
+          DEVELOPER_ID_INSTALLER_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_PASSWORD }}
+          DEVELOPER_ACCOUNT_USERNAME: ${{ secrets.DEVELOPER_ACCOUNT_USERNAME }}
+          DEVELOPER_ACCOUNT_PASSWORD: ${{ secrets.DEVELOPER_ACCOUNT_PASSWORD }}
+          DEVELOPER_ACCOUNT_TEAM: ${{ secrets.DEVELOPER_ACCOUNT_TEAM }}
+
+      - name: Purging signing keychain
+        run: |
+          security delete-keychain $RUNNER_TEMP/build.keychain
+
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.create_release_deb.outputs.upload_url }}
+          asset_path: installer/macos/target/pkg-signed/oco-agent.pkg
+          asset_name: oco-agent.pkg
+          asset_content_type: application/octet-stream
+
+  create_exe:
+    name: Create Windows package
+    runs-on: windows-2022
+    needs: create_release_deb
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Create venv
+        run: python -m venv venv
+
+      - name: Install Python packages
+        run: venv/Scripts/pip install pyinstaller .
+
+      - name: Compile binaries
+        run: venv/Scripts/pyinstaller oco-agent.windows.spec
+
+      - name: Execute package build
+        run: |
+          cd installer\windows\ && "%programfiles(x86)%\Inno Setup 6\iscc.exe" "oco-agent.iss"
+        shell: cmd
+
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.create_release_deb.outputs.upload_url }}
+          asset_path: installer/windows/oco-agent.exe
+          asset_name: oco-agent.exe
+          asset_content_type: application/vnd.microsoft.portable-executable
