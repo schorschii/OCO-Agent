@@ -107,7 +107,7 @@ jobs:
           echo "${{ secrets.DEVELOPER_ID_INSTALLER_CERT_BASE64 }}" | base64 --decode > $CERT_FILE
           security import $CERT_FILE -k $KEYCHAIN_NAME -P "${{ secrets.DEVELOPER_ID_INSTALLER_CERT_PASSWORD }}" -T /usr/bin/pkgbuild -T /usr/bin/productsign >/dev/null 2>&1
           rm -fr $CERT_FILE
-          security find-identity -v  #-p codesigning
+          #security find-identity -v  #-p codesigning
 
           # enable codesigning from a non user interactive shell
           security set-key-partition-list -S apple-tool:,apple: -s -k $KEYCHAIN_PASS $KEYCHAIN_NAME >/dev/null 2>&1
