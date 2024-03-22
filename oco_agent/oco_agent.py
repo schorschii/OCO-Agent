@@ -66,6 +66,7 @@ elif 'darwin' in OS_TYPE:
 ##### GLOBAL VARIABLES #####
 
 restartFlag = False
+configParser = configparser.RawConfigParser()
 config = {
 	# Agent config
 	'debug': False,
@@ -939,17 +940,17 @@ def lockClean(lockfile):
 
 ##### AGENT MAIN LOOP #####
 
-def daemon():
+def daemon(args):
 	while(True):
-		try: mainloop()
+		try: mainloop(args)
 		except KeyError as e: print(logtime()+'KeyError: '+str(e))
 		print(logtime()+'Running in daemon mode. Waiting '+str(config['query-interval'])+' seconds to send next request.')
 		time.sleep(config['query-interval'])
 
 # the main server communication function
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
-def mainloop():
-	global restartFlag
+def mainloop(args):
+	global restartFlag, configParser
 
 	# send initial request
 	print(logtime()+'Sending agent_hello...')
@@ -1157,11 +1158,9 @@ def main():
 		parser.add_argument('--daemon', action='store_true')
 		args = parser.parse_args()
 		configFilePath = args.config
-		daemonMode = args.daemon
 		print(logtime()+'OCO Agent starting with config file: '+configFilePath+' ...')
 
 		# read config
-		configParser = configparser.RawConfigParser()
 		configParser.read(configFilePath)
 		if(configParser.has_section('agent')):
 			config['debug'] = (int(configParser['agent'].get('debug', config['debug'])) == 1)
@@ -1198,14 +1197,14 @@ def main():
 		sys.exit(1)
 
 	# execute the agent as daemon if requested
-	if(daemonMode == True):
+	if(args.daemon):
 		lockCheck()
-		daemon()
+		daemon(args)
 
 	# execute the agent once
 	else:
 		lockCheck()
-		try: mainloop()
+		try: mainloop(args)
 		except KeyError as e:
 			print(logtime()+'KeyError: '+str(e))
 			sys.exit(1)
