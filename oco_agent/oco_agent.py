@@ -80,6 +80,7 @@ config = {
 	'report-frames': 8192, # report download progress every 64 MiB
 	'report-job-output': 5, # report job output every x secs if new lines appeared
 	'hostname-remove-domain': True,
+	'machine-uid': '',
 	# Platform specific agent config
 	'linux': {},
 	'macos': {},
@@ -823,7 +824,7 @@ def jsonRequest(method, data):
 		'id': 1,
 		'method': method,
 		'params': {
-			'uid': getMachineUid(),
+			'uid': config['machine-uid'],
 			'hostname': getHostname(),
 			'agent-key': config['agent-key'],
 			'data': data
@@ -1058,7 +1059,7 @@ def mainloop(args):
 						})
 						downloadFile(
 							config['api-url'],
-							{'uid': getMachineUid(), 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id']},
+							{'uid': config['machine-uid'], 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id']},
 							tempZipPath,
 							job['id']
 						)
@@ -1181,6 +1182,7 @@ def main():
 			config['report-frames'] = int(configParser['agent'].get('report-frames', config['report-frames']))
 			config['report-job-output'] = int(configParser['agent'].get('report-job-output', config['report-job-output']))
 			config['agent-key'] = configParser['agent'].get('agent-key', config['agent-key'])
+			config['machine-uid'] = configParser['agent'].get('machine-uid', getMachineUid())
 		if(configParser.has_section('server')):
 			config['api-url'] = configParser['server'].get('api-url', config['api-url'])
 			config['server-key'] = configParser['server'].get('server-key', config['server-key'])
