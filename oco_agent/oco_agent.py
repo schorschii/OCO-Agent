@@ -1030,6 +1030,9 @@ def mainloop(args):
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
 			ignoreContainerIds = []
 			for job in responseJson['result']['params']['software-jobs']:
+				if('id' not in job or 'procedure' not in job):
+					print(logtime()+'Invalid job, skipping')
+					continue
 				if('container-id' in job and job['container-id'] in ignoreContainerIds):
 					print(logtime()+'Skipping Software Job '+str(job['id'])+' because container id '+str(job['container-id'])+' should be ignored.')
 					continue
@@ -1054,6 +1057,7 @@ def mainloop(args):
 
 					# download if needed
 					if(job['download'] == True):
+						print(logtime()+'Downloading into '+tempZipPath+'...')
 						jsonRequest('oco.agent.update_job_state', {
 							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 0, 'message': ''
 						})
@@ -1067,9 +1071,11 @@ def mainloop(args):
 							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 101, 'message': ''
 						})
 						with ZipFile(tempZipPath, 'r') as zipObj:
+							print(logtime()+'Unzipping into '+tempPath+'...')
 							zipObj.extractall(tempPath)
 
 					# change to tmp dir and execute procedure
+					print(logtime()+'Executing: '+job['procedure']+'...')
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_EXECUTING, 'return-code': None, 'download-progress': 100, 'message': ''
 					})
@@ -1105,6 +1111,7 @@ def mainloop(args):
 							continue
 
 					# cleanup
+					print(logtime()+'Cleanup unpacked package files...')
 					os.chdir(tempfile.gettempdir())
 					removeAll(tempPath)
 
