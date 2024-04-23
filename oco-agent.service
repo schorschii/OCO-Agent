@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 Restart=always
 RestartSec=5
+TimeoutStopSec=320
 ExecStart=/usr/share/oco-agent/oco-agent --daemon --config /etc/oco-agent.ini
 
 [Install]

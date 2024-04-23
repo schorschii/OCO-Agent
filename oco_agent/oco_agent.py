@@ -15,6 +15,7 @@ try:
 	import pip_system_certs.wrapt_requests
 except ImportError: pass
 
+import signal
 import threading
 import requests
 import json
@@ -65,6 +66,7 @@ elif 'darwin' in OS_TYPE:
 
 ##### GLOBAL VARIABLES #####
 
+exitEvent = threading.Event()
 restartFlag = False
 configParser = configparser.RawConfigParser()
 config = {
@@ -941,11 +943,14 @@ def lockClean(lockfile):
 ##### AGENT MAIN LOOP #####
 
 def daemon(args):
-	while(True):
-		try: mainloop(args)
-		except KeyError as e: print(logtime()+'KeyError: '+str(e))
+	global exitEvent
+	while not exitEvent.is_set():
+		try:
+			mainloop(args)
+		except KeyError as e:
+			print(logtime()+'KeyError: '+str(e))
 		print(logtime()+'Running in daemon mode. Waiting '+str(config['query-interval'])+' seconds to send next request.')
-		time.sleep(config['query-interval'])
+		exitEvent.wait(config['query-interval'])
 
 # the main server communication function
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
@@ -1149,6 +1154,10 @@ def mainloop(args):
 			if(len(events) > 0):
 				jsonRequest('oco.agent.events', {'events':events})
 
+def signal_handler(signum, frame):
+	global exitEvent
+	exitEvent.set()
+
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 def main():
 	try:
@@ -1196,14 +1205,19 @@ def main():
 		print(logtime()+str(e))
 		sys.exit(1)
 
+	# check if already running
+	lockCheck()
+
+	# handle the TERM/INT signal neatly - do not interrupt running software jobs
+	signal.signal(signal.SIGTERM, signal_handler)
+	signal.signal(signal.SIGINT, signal_handler)
+
 	# execute the agent as daemon if requested
 	if(args.daemon):
-		lockCheck()
 		daemon(args)
 
 	# execute the agent once
 	else:
-		lockCheck()
 		try: mainloop(args)
 		except KeyError as e:
 			print(logtime()+'KeyError: '+str(e))
