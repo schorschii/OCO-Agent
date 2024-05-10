@@ -153,13 +153,13 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.8'
 
       - name: Create venv
         run: python -m venv venv
 
       - name: Install Python packages
-        run: venv/Scripts/pip install pyinstaller .
+        run: venv/Scripts/pip install pyinstaller==5.5 .
 
       - name: Compile binaries
         run: venv/Scripts/pyinstaller oco-agent.windows.spec
