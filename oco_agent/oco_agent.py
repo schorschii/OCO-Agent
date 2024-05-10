@@ -13,7 +13,8 @@
 
 try:
 	import pip_system_certs.wrapt_requests
-except ImportError: pass
+except ImportError:
+	print('ATTENTION: unable to load pip_system_certs.wrapt_requests')
 
 import signal
 import threading
@@ -43,7 +44,7 @@ import re
 
 ##### CONSTANTS #####
 
-AGENT_VERSION = '1.0.3'
+from .__init__ import __version__
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+'/oco-agent.ini'
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -961,7 +962,7 @@ def mainloop(args):
 	# send initial request
 	print(logtime()+'Sending agent_hello...')
 	request = jsonRequest('oco.agent.hello', {
-		'agent_version': AGENT_VERSION,
+		'agent_version': __version__,
 		'networks': getNics(),
 		'services': getServiceStatus(),
 		'uptime': getUptime()
@@ -1000,7 +1001,7 @@ def mainloop(args):
 			print(logtime()+'Updating inventory data...')
 			jsonRequest('oco.agent.update', {
 				'hostname': getHostname(),
-				'agent_version': AGENT_VERSION,
+				'agent_version': __version__,
 				'os': getOs(),
 				'os_version': getOsVersion(),
 				'os_license': getIsActivated(),
