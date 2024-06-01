@@ -23,7 +23,7 @@ jobs:
 
       - name: Install Debian packages
         run: |
-          sudo apt install -y python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv python3-systemd mokutil
+          sudo apt update && sudo apt install -y python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv python3-systemd mokutil
 
       - name: Create venv
         run: python3 -m venv venv --system-site-packages
