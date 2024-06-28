@@ -58,11 +58,20 @@ if 'win32' in OS_TYPE:
 	import wmi, winreg
 	from winevt_ng import EventLog
 	from win32com.client import GetObject
+
 elif 'linux' in OS_TYPE:
 	import utmp
 	SERVICE_CHECKS_PATH = '/usr/lib/oco-agent/service-checks'
+
 elif 'darwin' in OS_TYPE:
 	import plistlib
+	# set OpenSSL path to macOS defaults
+	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
+	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
+	os.environ['SSL_CERT_DIR']  = '/private/etc/ssl/certs'
+	# system CA certs debugging
+	#import ssl; print(ssl.get_default_verify_paths())
+	#ctx = ssl.SSLContext(); ctx.load_default_certs(); print(ctx.get_ca_certs())
 
 
 ##### GLOBAL VARIABLES #####
