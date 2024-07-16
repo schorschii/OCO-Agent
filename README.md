@@ -70,11 +70,12 @@ Set the URL to the server's `api-agent.php` and set correct agent key (as define
 **General Note:** If you leave the server name empty, the agent tries to query the SRV record `_oco._tcp.yourdomain.tld` on the first startup from your DNS. The agent will then use this value and save the server name in its config file.
 
 ### macOS Hostname Note
-macOS uses dynamic hostnames from your DHCP server by default. This behaviour may not be desired when using OCO since the hostname is a unique identifier in the OCO server. You can disable this feature in the system settings:
+macOS uses the dynamic hostname from your DHCP server by default and stores it as `LocalHostName`. This behaviour is not be desired when using OCO since the hostname is a unique identifier in the OCO server. You can disable this feature by setting a fixed `HostName` via command line:
+```
+sudo scutil --set HostName <yourcomputername>
+```
 
-1. Open System Preferences, click General -> Sharing -> Edit (Local Hostname)
-2. Uncheck the "Use dynamic global hostname" checkbox and set the desired, unique hostname.
-3. Open the Terminal from the Applications / Utilities folder and look at the hostname on the prompt, ensure that it is correct.
+Open the Terminal from the Applications / Utilities folder and look at the hostname on the prompt, ensure that it is correct.
 
 ## Integration in your OS installation
 You can use known techniques to integrate the agent into your "golden master" OS image. Please have a look at [OS-Installation.md](https://github.com/schorschii/OCO-Server/blob/master/docs/OS-Installation.md) in the docs of the OCO server repo for more information.
