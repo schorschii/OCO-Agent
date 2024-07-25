@@ -42,7 +42,7 @@ getutxent_wtmp.restype = POINTER(utmpx)
 endutxent_wtmp = c.setutxent_wtmp
 endutxent_wtmp.restype = None
 
-def getLogins(since):
+def getLogins(since, usernameWithDomain=False):
 	# server's `since` value is in UTC
 	dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
 

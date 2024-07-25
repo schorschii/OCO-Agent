@@ -5,7 +5,7 @@ from .. import logger
 import utmp
 import datetime, os, shlex
 
-def getLogins(since):
+def getLogins(since, usernameWithDomain=False):
 	# server's `since` value is in UTC
 	dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
 

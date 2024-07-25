@@ -17,7 +17,7 @@ import datetime
 #  10: RemoteInteractive (RDP)
 #  11: CachedInteractive (local console without connection to AD server)
 
-def getLogins(since):
+def getLogins(since, usernameWithDomain=False):
 	# server's `since` value is in UTC
 	dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
 
@@ -45,7 +45,7 @@ def getLogins(since):
 			users.append({
 				'guid': queryRegistryUserGuid(event['TargetUserSid']),
 				'display_name': queryRegistryUserDisplayName(event['TargetUserSid']),
-				'username': event['TargetDomainName']+'\\'+event['TargetUserName'] if config['windows']['username-with-domain'] else event['TargetUserName'],
+				'username': event['TargetDomainName']+'\\'+event['TargetUserName'] if usernameWithDomain else event['TargetUserName'],
 				'console': event['IpAddress'],
 				'timestamp': dateObject.strftime('%Y-%m-%d %H:%M:%S')
 			})

@@ -935,7 +935,7 @@ def mainloop(args):
 				'printers': getPrinters(),
 				'partitions': getPartitions(),
 				'software': getInstalledSoftware(),
-				'logins': getLogins(loginsSince)
+				'logins': getLogins(loginsSince, config['windows']['username-with-domain'])
 			})
 
 		# execute jobs if requested
