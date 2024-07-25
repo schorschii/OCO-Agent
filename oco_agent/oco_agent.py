@@ -58,14 +58,15 @@ if 'win32' in OS_TYPE:
 	import wmi, winreg
 	from winevt_ng import EventLog
 	from win32com.client import GetObject
+	from .windows.event_log import getLogins
 
 elif 'linux' in OS_TYPE:
-	import utmp
+	from .linux.utmp import getLogins
 	SERVICE_CHECKS_PATH = '/usr/lib/oco-agent/service-checks'
 
 elif 'darwin' in OS_TYPE:
 	import plistlib
-	from .macos.utmpx import parseUtmpx
+	from .macos.utmpx import getLogins
 	# set OpenSSL path to macOS defaults
 	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
 	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
@@ -621,88 +622,6 @@ def getPartitions():
 			})
 	return partitions
 
-def queryRegistryUserDisplayName(querySid):
-	# get user fullname from SessionData cache in registry
-	try:
-		key = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Authentication\\LogonUI\\SessionData'
-		reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
-		count = 0
-		while True:
-			name = winreg.EnumKey(reg, count)
-			count = count + 1
-			reg2 = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key+'\\'+name, 0, winreg.KEY_READ)
-			sid, regtype = winreg.QueryValueEx(reg2, 'LoggedOnUserSID')
-			if querySid == sid:
-				displayName, regtype = winreg.QueryValueEx(reg2, 'LoggedOnDisplayName')
-				return displayName
-	except WindowsError as e: pass
-	return ''
-def queryRegistryUserGuid(querySid):
-	# get user GUID from ProfileList in registry
-	try:
-		key = f'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\{querySid}'
-		reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
-		guid, regtype = winreg.QueryValueEx(reg, 'Guid')
-		return guid.strip('{}')
-	except WindowsError as e: pass
-	return None
-def getLogins(since):
-	users = []
-	dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc) # server's `since` value is in UTC
-	if 'win32' in OS_TYPE:
-		# Logon Types
-		#  2: Interactive (local console)
-		#  3: Network (access to network shares and printers)
-		#  4: Batch (scheduled tasks)
-		#  5: Service
-		#  7: Unlock
-		#  8: NetworkCleartext
-		#  9: NewCredentials (users executes program as another user using "runas")
-		#  10: RemoteInteractive (RDP)
-		#  11: CachedInteractive (local console without connection to AD server)
-		try:
-			query = EventLog.Query('Security', "<QueryList><Query Id='0' Path='Security'><Select Path='Security'>*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]</Select></Query></QueryList>")
-			consolidatedEventList = []
-			for event in query:
-				eventDict = { 'TargetUserSid':'', 'TargetUserName':'', 'TargetDomainName':'', 'LogonType':'', 'IpAddress':'', 'LogonProcessName':'',
-					'TimeCreated':event.System.TimeCreated['SystemTime'] }
-				# put data of interest to dict
-				for data in event.EventData.Data:
-					if(data['Name'] in ['TargetUserSid', 'TargetUserName', 'TargetDomainName', 'LogonType', 'IpAddress', 'LogonProcessName']):
-						eventDict[data['Name']] = data.cdata
-				# eliminate duplicates and curious system logins
-				if eventDict not in consolidatedEventList and eventDict['LogonProcessName'].strip() == 'User32':
-					consolidatedEventList.append(eventDict)
-			for event in consolidatedEventList:
-				# example timestamp: 2021-04-09T13:47:14.719737700Z
-				dateObject = datetime.datetime.strptime(event['TimeCreated'].split('.')[0], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=datetime.timezone.utc) # Windows event log timestamps are in UTC
-				if(dateObject <= dateObjectSince): continue
-				users.append({
-					'guid': queryRegistryUserGuid(event['TargetUserSid']),
-					'display_name': queryRegistryUserDisplayName(event['TargetUserSid']),
-					'username': event['TargetDomainName']+'\\'+event['TargetUserName'] if config['windows']['username-with-domain'] else event['TargetUserName'],
-					'console': event['IpAddress'],
-					'timestamp': dateObject.strftime('%Y-%m-%d %H:%M:%S')
-				})
-		except Exception as e:
-			print(logtime()+str(e))
-	elif 'linux' in OS_TYPE:
-		with open('/var/log/wtmp', 'rb') as fd:
-			buf = fd.read()
-			for entry in utmp.read(buf):
-				if(str(entry.type) == 'UTmpRecordType.user_process'):
-					dateObject = datetime.datetime.utcfromtimestamp(entry.sec).replace(tzinfo=datetime.timezone.utc) # utmp values are in UTC
-					if(dateObject <= dateObjectSince): continue
-					users.append({
-						'display_name': os.popen('getent passwd '+shlex.quote(entry.user)+' | cut -d : -f 5').read().strip().rstrip(','),
-						'username': entry.user,
-						'console': entry.line,
-						'timestamp': dateObject.strftime('%Y-%m-%d %H:%M:%S')
-					})
-	elif 'darwin' in OS_TYPE:
-		users = parseUtmpx(dateObjectSince)
-	return users
-
 def getEvents(log, query, since):
 	maxBatch = 10000
 	foundEvents = []
@@ -867,6 +786,7 @@ def removeAll(path):
 			os.rmdir(os.path.join(root, name))
 	os.rmdir(path)
 
+# deprecated - should be replaced by logger()
 def logtime():
 	return '['+str(datetime.datetime.now())+'] '
 
