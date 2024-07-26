@@ -385,7 +385,7 @@ def getLocale():
 		try:
 			command = 'osascript -e "user locale of (get system info)"'
 			return os.popen(command).read().strip()
-		except Exception as e: print(logtime()+str(e))
+		except Exception as e: logger(e)
 	else: return '-'
 
 def getCpu():
@@ -432,7 +432,7 @@ def getLinuxXAuthority():
 			if(os.path.exists(checkFile)):
 				return {'file':checkFile, 'display':display}
 	except Exception as e:
-		print(logtime()+str(e))
+		logger('Unable to get X authority:', e)
 	return None
 def getScreens():
 	screens = []
@@ -465,8 +465,8 @@ def getScreens():
 						'serialno': edidp.serial or '-',
 						'technology': str(edidp.type or '-')
 					})
-				except Exception as e: print(logtime()+str(e))
-		except Exception as e: print(logtime()+str(e))
+				except Exception as e: logger('Unable to get screen details:', e)
+		except Exception as e: logger('Unable to get attached screens:', e)
 	elif 'linux' in OS_TYPE:
 		try:
 			xAuthority = getLinuxXAuthority()
@@ -489,8 +489,8 @@ def getScreens():
 						'serialno': edidp.serial or '-',
 						'technology': str(edidp.type or '-')
 					})
-				except Exception as e: print(logtime()+str(e))
-		except Exception as e: print(logtime()+str(e))
+				except Exception as e: logger('Unable to get screen details:', e)
+		except Exception as e: logger('Unable to get attached screens:', e)
 	elif 'darwin' in OS_TYPE:
 		try:
 			command = 'system_profiler SPDisplaysDataType -json'
@@ -514,8 +514,8 @@ def getScreens():
 							'serialno': edidp.serial or '-',
 							'technology': str(edidp.type or '-')
 						})
-					except Exception as e: print(logtime()+str(e))
-		except Exception as e: print(logtime()+str(e))
+					except Exception as e: logger('Unable to get screen details:', e)
+		except Exception as e: logger('Unable to get attached screens:', e)
 	return screens
 
 def winPrinterStatus(status, state):
@@ -655,7 +655,7 @@ def getServiceStatus():
 	for file in [f for f in os.listdir(SERVICE_CHECKS_PATH) if os.path.isfile(os.path.join(SERVICE_CHECKS_PATH, f))]:
 		serviceScriptPath = os.path.join(SERVICE_CHECKS_PATH, file)
 		startTime = time.time()
-		print(logtime()+'Executing service check script '+serviceScriptPath+'...')
+		logger('Executing service check script '+serviceScriptPath+'...')
 		res = subprocess.run(serviceScriptPath, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
 		# example output (CheckMK format): 0 "My service" myvalue=73;80;90 My output text
 		# https://docs.checkmk.com/latest/de/localchecks.html
@@ -715,19 +715,19 @@ def jsonRequest(method, data):
 
 	try:
 		# send request
-		if(config['debug']): print(logtime()+'< ' + data_json)
+		if(config['debug']): logger('< ' + data_json)
 		response = requests.post(config['api-url'], data=data_json, headers=headers, timeout=(config['connection-timeout'],config['read-timeout']))
 
 		# print response
-		if(config['debug']): print(logtime()+'> (' + str(response.elapsed.total_seconds()) + 's) [' + str(response.status_code) + '] ' + response.text)
+		if(config['debug']): logger('> (' + str(response.elapsed.total_seconds()) + 's) [' + str(response.status_code) + '] ' + response.text)
 		if(response.status_code != 200):
-			print(logtime()+'Request failed with HTTP status code ' + str(response.status_code))
+			logger('Request failed with HTTP status code ' + str(response.status_code))
 
 		# return response
 		return response
 
 	except Exception as e:
-		print(logtime()+str(e))
+		logger(e)
 		return None
 
 
@@ -755,10 +755,6 @@ def removeAll(path):
 		for name in dirs:
 			os.rmdir(os.path.join(root, name))
 	os.rmdir(path)
-
-# deprecated - should be replaced by logger()
-def logtime():
-	return '['+str(datetime.datetime.now())+'] '
 
 def guessEncodingAndDecode(textBytes, codecs=['utf-8', 'cp1252', 'cp850']):
 	for codec in codecs:
@@ -789,7 +785,7 @@ def lockCheck():
 		with open(LOCKFILE_PATH, 'x') as lockfile:
 			pid = str(os.getpid())
 			lockfile.write(pid)
-			print(logtime()+'OCO Agent starting with lock file (pid '+pid+')...')
+			logger('OCO Agent starting with lock file (pid '+pid+')...')
 	except IOError:
 		# there is a lock file - check if pid from lockfile is still active
 		with open(LOCKFILE_PATH, 'r') as lockfile:
@@ -805,22 +801,22 @@ def lockCheck():
 			except Exception: pass
 			if(alreadyRunning):
 				# another instance is still running -> exit
-				print(logtime()+'OCO Agent already running at pid '+str(oldpid)+' (lock file '+LOCKFILE_PATH+'). Exiting.')
+				logger('OCO Agent already running at pid '+str(oldpid)+' (lock file '+LOCKFILE_PATH+'). Exiting.')
 				sys.exit()
 			else:
 				# process is not running anymore -> delete lockfile and start agent
-				print(logtime()+'Cleaning up orphaned lock file (pid '+str(oldpid)+' is not running anymore) and starting OCO Agent...')
+				logger('Cleaning up orphaned lock file (pid '+str(oldpid)+' is not running anymore) and starting OCO Agent...')
 				os.unlink(LOCKFILE_PATH)
 				with open(LOCKFILE_PATH, 'x') as lockfile:
 					pid = str(os.getpid())
 					lockfile.write(pid)
-					print(logtime()+'OCO Agent starting with lock file (pid '+pid+')...')
+					logger('OCO Agent starting with lock file (pid '+pid+')...')
 	atexit.register(lockClean, lockfile)
 # clean up lockfile
 def lockClean(lockfile):
 	lockfile.close()
 	os.unlink(LOCKFILE_PATH)
-	print(logtime()+'Closing lock file and exiting.')
+	logger('Closing lock file and exiting.')
 
 
 ##### AGENT MAIN LOOP #####
@@ -831,8 +827,8 @@ def daemon(args):
 		try:
 			mainloop(args)
 		except KeyError as e:
-			print(logtime()+'KeyError: '+str(e))
-		print(logtime()+'Running in daemon mode. Waiting '+str(config['query-interval'])+' seconds to send next request.')
+			logger('KeyError:', e)
+		logger('Running in daemon mode. Waiting '+str(config['query-interval'])+' seconds to send next request.')
 		exitEvent.wait(config['query-interval'])
 
 # the main server communication function
@@ -841,7 +837,7 @@ def mainloop(args):
 	global restartFlag, configParser
 
 	# send initial request
-	print(logtime()+'Sending agent_hello...')
+	logger('Sending agent_hello...')
 	request = jsonRequest('oco.agent.hello', {
 		'agent_version': __version__,
 		'networks': getNics(),
@@ -855,7 +851,7 @@ def mainloop(args):
 
 		# save server key if server key is not already set in local config
 		if(config['server-key'] == None or config['server-key'] == ''):
-			print(logtime()+'Write new config with updated server key...')
+			logger('Write new config with updated server key...')
 			if(not configParser.has_section('server')): configParser.add_section('server')
 			configParser.set('server', 'server-key', responseJson['result']['params']['server-key'])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
@@ -863,12 +859,12 @@ def mainloop(args):
 
 		# check server key
 		if(config['server-key'] != responseJson['result']['params']['server-key']):
-			print(logtime()+'!!! Invalid server key, abort.')
+			logger('!!! Invalid server key, abort.')
 			return
 
 		# update agent key if requested
 		if(responseJson['result']['params']['agent-key'] != None):
-			print(logtime()+'Write new config with updated agent key...')
+			logger('Write new config with updated agent key...')
 			if(not configParser.has_section('agent')): configParser.add_section('agent')
 			configParser.set('agent', 'agent-key', responseJson['result']['params']['agent-key'])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
@@ -879,7 +875,7 @@ def mainloop(args):
 		if('logins-since' in responseJson['result']['params']):
 			loginsSince = responseJson['result']['params']['logins-since']
 		if(responseJson['result']['params']['update'] == 1):
-			print(logtime()+'Updating inventory data...')
+			logger('Updating inventory data...')
 			jsonRequest('oco.agent.update', {
 				'hostname': getHostname(),
 				'agent_version': __version__,
@@ -913,25 +909,25 @@ def mainloop(args):
 			ignoreContainerIds = []
 			for job in responseJson['result']['params']['software-jobs']:
 				if('id' not in job or 'procedure' not in job):
-					print(logtime()+'Invalid job, skipping')
+					logger('Invalid job, skipping')
 					continue
 				if('container-id' in job and job['container-id'] in ignoreContainerIds):
-					print(logtime()+'Skipping Software Job '+str(job['id'])+' because container id '+str(job['container-id'])+' should be ignored.')
+					logger('Skipping Software Job '+str(job['id'])+' because container id '+str(job['container-id'])+' should be ignored.')
 					continue
 				if(job['procedure'].strip() == ''):
-					print(logtime()+'Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
+					logger('Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_FINISHED, 'return-code': 0, 'message': ''
 					})
 					continue
 				if(restartFlag == True):
-					print(logtime()+'Skipping Software Job '+str(job['id'])+' because restart flag is set.')
+					logger('Skipping Software Job '+str(job['id'])+' because restart flag is set.')
 					continue
 
 				try:
 
 					# create temp dir
-					print(logtime()+'Begin Software Job '+str(job['id']))
+					logger('Begin Software Job '+str(job['id']))
 					tempZipPath = tempfile.gettempdir()+'/oco-staging.zip'
 					tempPath = tempfile.gettempdir()+'/oco-staging'
 					if(os.path.exists(tempPath)): removeAll(tempPath)
@@ -939,7 +935,7 @@ def mainloop(args):
 
 					# download if needed
 					if(job['download'] == True):
-						print(logtime()+'Downloading into '+tempZipPath+'...')
+						logger('Downloading into '+tempZipPath+'...')
 						jsonRequest('oco.agent.update_job_state', {
 							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 0, 'message': ''
 						})
@@ -953,11 +949,11 @@ def mainloop(args):
 							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 101, 'message': ''
 						})
 						with ZipFile(tempZipPath, 'r') as zipObj:
-							print(logtime()+'Unzipping into '+tempPath+'...')
+							logger('Unzipping into '+tempPath+'...')
 							zipObj.extractall(tempPath)
 
 					# change to tmp dir and execute procedure
-					print(logtime()+'Executing: '+job['procedure']+'...')
+					logger('Executing: '+job['procedure']+'...')
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_EXECUTING, 'return-code': None, 'download-progress': 100, 'message': ''
 					})
@@ -987,13 +983,13 @@ def mainloop(args):
 							jobSucceeded = bool(jobStatusResponseJson['result']['params']['job-succeeded'])
 						except KeyError: pass
 						if(not jobSucceeded):
-							print(logtime()+'Add container id '+str(job['container-id'])+' to ignore array because server told me that the current job failed and sequence mode is set to 1.')
+							logger('Add container id '+str(job['container-id'])+' to ignore array because server told me that the current job failed and sequence mode is set to 1.')
 							ignoreContainerIds.append(job['container-id'])
 							os.chdir(tempfile.gettempdir())
 							continue
 
 					# cleanup
-					print(logtime()+'Cleanup unpacked package files...')
+					logger('Cleanup unpacked package files...')
 					os.chdir(tempfile.gettempdir())
 					removeAll(tempPath)
 
@@ -1021,7 +1017,7 @@ def mainloop(args):
 
 					# execute agent exit if requested (for agent update)
 					if('exit' in job and job['exit'] != None and isinstance(job['exit'], int) and job['exit'] >= 0):
-						print(logtime()+'Agent Exit Requested. Bye...')
+						logger('Agent Exit Requested. Bye...')
 						if 'win32' in OS_TYPE:
 							# restart service via scheduled task - if somebody has a better idea how to self-restart the service: contributions welcome!
 							subprocess.run(['SCHTASKS', '/CREATE', '/F', '/RU', 'SYSTEM', '/SC', 'ONCE', '/ST', (datetime.datetime.now()+datetime.timedelta(minutes=1)).strftime("%H:%M"), '/TN', 'OCO Service Restart After Update', '/TR', 'cmd /c "net stop oco-agent & net start oco-agent"'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
@@ -1029,7 +1025,7 @@ def mainloop(args):
 						sys.exit(0)
 
 				except Exception as e:
-					print(logtime()+str(e))
+					logger(e)
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_ERROR, 'return-code': -9999, 'message': str(e)
 					})
@@ -1057,7 +1053,7 @@ def main():
 		parser.add_argument('--daemon', action='store_true')
 		args = parser.parse_args()
 		configFilePath = args.config
-		print(logtime()+'OCO Agent starting with config file: '+configFilePath+' ...')
+		logger('OCO Agent starting with config file: '+configFilePath+' ...')
 
 		# read config
 		configParser.read(configFilePath)
@@ -1080,20 +1076,21 @@ def main():
 
 		# try server auto discovery
 		if(config['api-url'].strip() == ''):
-			print(logtime()+'Server API URL is empty - trying DNS auto discovery ...')
+			logger('Server API URL is empty - trying DNS auto discovery ...')
 			try:
 				res = resolver.resolve(qname='_oco._tcp', rdtype=rdatatype.SRV, lifetime=10, search=True)
 				for srv in res.rrset:
 					config['api-url'] = 'https://'+str(srv.target)+':'+str(srv.port)+'/api-agent.php'
-					print(logtime()+'DNS auto discovery found server: '+config['api-url'])
+					logger('DNS auto discovery found server:', config['api-url'])
 					if(not configParser.has_section('server')): configParser.add_section('server')
 					configParser.set('server', 'api-url', config['api-url'])
 					with open(configFilePath, 'w') as fileHandle: configParser.write(fileHandle)
 					break
-			except Exception as e: print(logtime()+'DNS auto discovery failed: '+str(e))
+			except Exception as e:
+				logger('DNS auto discovery failed:', e)
 
 	except Exception as e:
-		print(logtime()+str(e))
+		logger(e)
 		sys.exit(1)
 
 	# check if already running
@@ -1111,7 +1108,7 @@ def main():
 	else:
 		try: mainloop(args)
 		except KeyError as e:
-			print(logtime()+'KeyError: '+str(e))
+			logger('KeyError:', e)
 			sys.exit(1)
 
 if __name__ == '__main__':
