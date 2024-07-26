@@ -29,7 +29,12 @@ setup(
             'Programming Language :: Python',
             'Programming Language :: Python :: 3',
       ],
-      packages=['oco_agent'],
+      packages=[
+            'oco_agent',
+            'oco_agent.linux',
+            'oco_agent.macos',
+            'oco_agent.windows',
+      ],
       entry_points={
             'console_scripts': [
                   'oco-agent = oco_agent.oco_agent:main',
