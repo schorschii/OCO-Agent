@@ -44,7 +44,7 @@ import re
 
 ##### CONSTANTS #####
 
-from .__init__ import __version__
+from . import __version__, logger
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+'/oco-agent.ini'
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
@@ -56,17 +56,18 @@ OS_TYPE = sys.platform.lower()
 
 if 'win32' in OS_TYPE:
 	import wmi, winreg
-	from winevt_ng import EventLog
 	from win32com.client import GetObject
-	from .windows.event_log import getLogins
+	from .windows.event_log import getLogins as getLoginsWindows
+	from .windows.event_log import getEvents as getEventsWindows
 
 elif 'linux' in OS_TYPE:
-	from .linux.utmp import getLogins
+	from .linux.utmp import getLogins as getLoginsLinux
+	from .linux.systemd import getEvents as getEventsLinux
 	SERVICE_CHECKS_PATH = '/usr/lib/oco-agent/service-checks'
 
 elif 'darwin' in OS_TYPE:
 	import plistlib
-	from .macos.utmpx import getLogins
+	from .macos.utmpx import getLogins as getLoginsMac
 	# set OpenSSL path to macOS defaults
 	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
 	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
@@ -622,62 +623,33 @@ def getPartitions():
 			})
 	return partitions
 
+def getLogins(since):
+	logins = []
+	try:
+		# server's `since` value is in UTC
+		dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
+		if 'win32' in OS_TYPE:
+			logins = getLoginsWindows(dateObjectSince, config['windows']['username-with-domain'])
+		elif 'linux' in OS_TYPE:
+			logins = getLoginsLinux(dateObjectSince)
+		elif 'darwin' in OS_TYPE:
+			logins = getLoginsMac(dateObjectSince)
+	except Exception as e:
+		logger('Error reading logins:', e)
+	return logins
+
 def getEvents(log, query, since):
 	maxBatch = 10000
-	foundEvents = []
+	events = []
 	try:
 		dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S')
 		if 'win32' in OS_TYPE:
-			startTime = time.time()
-			print(logtime()+'Querying events from '+log+'...')
-			query = EventLog.Query(log, query)
-			for event in query:
-				dateObject = datetime.datetime.strptime(event.System.TimeCreated['SystemTime'].split('.')[0], '%Y-%m-%dT%H:%M:%S')
-				if(dateObject <= dateObjectSince): continue
-				eventDict = {
-					'log': log,
-					'provider': event.System.Provider['Name'],
-					'event_id': event.EventID,
-					'level': event.Level,
-					'timestamp': dateObject.strftime('%Y-%m-%d %H:%M:%S'),
-					'data': {}
-				}
-				if(hasattr(event, 'EventData')):
-					for data in event.EventData.children:
-						eventDict['data'][data['Name']] = str(data.cdata)
-				foundEvents.append(eventDict)
-				if(len(foundEvents) > maxBatch): break
-			if(config['debug']): print('  took '+str(time.time()-startTime))
+			events = getEventsWindows(log, query, dateObjectSince, maxBatch, debug=config['debug'])
 		elif 'linux' in OS_TYPE and log == 'journalctl':
-			startTime = time.time()
-			print(logtime()+'Querying events from journalctl...')
-			queryData = json.loads(query)
-			from systemd import journal
-			j = journal.Reader()
-			if('unit' in queryData):
-				for x in queryData['unit'].split(','): j.add_match(_SYSTEMD_UNIT=x.strip())
-			if('identifier' in queryData):
-				for x in queryData['identifier'].split(','): j.add_match(SYSLOG_IDENTIFIER=x.strip())
-			if('priority' in queryData):
-				for x in queryData['priority'].split(','): j.add_match(PRIORITY=x.strip())
-				#j.log_level(journal.LOG_INFO)
-			j.seek_realtime(dateObjectSince)
-			j.get_next()
-			for entry in j:
-				if entry['MESSAGE'] != '' and (not 'grep' in queryData or re.search(queryData['grep'], entry['MESSAGE'])):
-					foundEvents.append({
-						'log': entry['_SYSTEMD_UNIT'] if '_SYSTEMD_UNIT' in entry else 'journalctl',
-						'provider': entry['SYSLOG_IDENTIFIER'] if 'SYSLOG_IDENTIFIER' in entry else '',
-						'event_id': str(entry['SYSLOG_FACILITY']) if 'SYSLOG_FACILITY' in entry else '',
-						'level': str(entry['PRIORITY']) if 'PRIORITY' in entry else '',
-						'timestamp': entry['__REALTIME_TIMESTAMP'].strftime('%Y-%m-%d %H:%M:%S'),
-						'data': {'message':entry['MESSAGE']}
-					})
-					if(len(foundEvents) > maxBatch): break
-			if(config['debug']): print('  took '+str(time.time()-startTime))
+			events = getEventsLinux(log, query, dateObjectSince, maxBatch, debug=config['debug'])
 	except Exception as e:
-		print(logtime()+str(e))
-	return foundEvents
+		logger('Error reading events:', e)
+	return events
 
 def getServiceStatus():
 	services = []
@@ -935,7 +907,7 @@ def mainloop(args):
 				'printers': getPrinters(),
 				'partitions': getPartitions(),
 				'software': getInstalledSoftware(),
-				'logins': getLogins(loginsSince, config['windows']['username-with-domain'])
+				'logins': getLogins(loginsSince),
 			})
 
 		# execute jobs if requested
