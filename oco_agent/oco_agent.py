@@ -23,7 +23,7 @@ import json
 import socket
 import netifaces
 import platform
-import os, sys, stat
+import os, sys
 import configparser
 import argparse
 import psutil
@@ -32,14 +32,12 @@ from psutil import virtual_memory
 import distro
 import time
 import datetime
-from dateutil import tz
 import tempfile
 import subprocess
 import shlex
 import pyedid
 from zipfile import ZipFile
 from dns import resolver, rdatatype
-import re
 
 
 ##### CONSTANTS #####
