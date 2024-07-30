@@ -959,7 +959,9 @@ def mainloop(args):
 					})
 					os.chdir(tempPath)
 					# LD_LIBRARY_PATH set by PyInstaller causes problems e.g. with `apt` not finding its libaries, so we unset it for the child process
-					sub_env = os.environ.copy(); del sub_env['LD_LIBRARY_PATH']
+					sub_env = os.environ.copy()
+					if('LD_LIBRARY_PATH' in sub_env):
+						del sub_env['LD_LIBRARY_PATH']
 					proc = subprocess.Popen(
 						job['procedure'], shell=True, env=sub_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL
 					)
