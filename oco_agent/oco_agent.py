@@ -958,8 +958,10 @@ def mainloop(args):
 						'job-id': job['id'], 'state': JOB_STATE_EXECUTING, 'return-code': None, 'download-progress': 100, 'message': ''
 					})
 					os.chdir(tempPath)
+					# LD_LIBRARY_PATH set by PyInstaller causes problems e.g. with `apt` not finding its libaries, so we unset it for the child process
+					sub_env = os.environ.copy(); del sub_env['LD_LIBRARY_PATH']
 					proc = subprocess.Popen(
-						job['procedure'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL
+						job['procedure'], shell=True, env=sub_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL
 					)
 					jobOutputReportThread = threading.Thread(target=jobOutputReporter, args=(job['id'],))
 					jobOutputReportThread.endEvent = threading.Event()
