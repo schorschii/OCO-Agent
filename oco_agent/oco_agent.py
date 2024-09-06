@@ -154,11 +154,9 @@ def getNics():
 def getOs():
 	if 'win32' in OS_TYPE:
 		try:
-			registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion', 0, winreg.KEY_READ)
-			productName, regtype = winreg.QueryValueEx(registry_key, 'ProductName')
-			return str(productName)
-			winreg.CloseKey(registry_key)
-		except WindowsError: return platform.system()
+			return f"Windows {platform.win32_ver()[0]} {platform.win32_edition()}"
+		except Error:
+			return platform.system()
 	elif 'linux' in OS_TYPE:
 		return distro.name()
 	elif 'darwin' in OS_TYPE:
@@ -166,25 +164,7 @@ def getOs():
 
 def getOsVersion():
 	if 'win32' in OS_TYPE:
-		try:
-			registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion', 0, winreg.KEY_READ)
-			try:
-				# read CurrentMajorVersionNumber/CurrentMinorVersionNumber if exists (only Windows 10)
-				# the value "CurrentVersion" always shows "6.3" on Windows 10, great job Microsoft...
-				valueMajor, regtype = winreg.QueryValueEx(registry_key, 'CurrentMajorVersionNumber')
-				valueMinor, regtype = winreg.QueryValueEx(registry_key, 'CurrentMinorVersionNumber')
-				valueBuild, regtype = winreg.QueryValueEx(registry_key, 'CurrentBuildNumber')
-				winreg.CloseKey(registry_key)
-				return str(valueMajor)+'.'+str(valueMinor)+'.'+str(valueBuild)
-			except WindowsError: pass
-			try:
-				# fallback: read CurrentVersion on older Windows versions
-				valueVersion, regtype = winreg.QueryValueEx(registry_key, 'CurrentVersion')
-				valueBuild, regtype = winreg.QueryValueEx(registry_key, 'CurrentBuildNumber')
-				winreg.CloseKey(registry_key)
-				return str(valueVersion)+'.'+str(valueBuild)
-			except WindowsError: return '?'
-		except WindowsError: return '?'
+		return platform.win32_ver()[1]
 	elif 'linux' in OS_TYPE:
 		return distro.version()
 	elif 'darwin' in OS_TYPE:
