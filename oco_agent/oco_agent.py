@@ -53,7 +53,7 @@ OS_TYPE = sys.platform.lower()
 ##### OS SPECIFIC IMPORTS #####
 
 if 'win32' in OS_TYPE:
-	import wmi, winreg
+	import wmi, winreg, ctypes
 	from win32com.client import GetObject
 	from .windows.event_log import getLogins as getLoginsWindows
 	from .windows.event_log import getEvents as getEventsWindows
@@ -932,16 +932,25 @@ def mainloop(args):
 							logger('Unzipping into '+tempPath+'...')
 							zipObj.extractall(tempPath)
 
-					# change to tmp dir and execute procedure
+					# change to tmp dir
 					logger('Executing: '+job['procedure']+'...')
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_EXECUTING, 'return-code': None, 'download-progress': 100, 'message': ''
 					})
 					os.chdir(tempPath)
-					# LD_LIBRARY_PATH set by PyInstaller causes problems e.g. with `apt` not finding its libaries, so we unset it for the child process
+
+					# restore library search path for subprocess (modified by PyInstaller)
+					# causes problems e.g. with `apt` or the Windows upgrade `setup.exe` not finding its libaries
+					# see https://pyinstaller.org/en/v6.9.0/common-issues-and-pitfalls.html#launching-external-programs-from-the-frozen-application
 					sub_env = os.environ.copy()
-					if('LD_LIBRARY_PATH' in sub_env):
+					if('LD_LIBRARY_PATH_ORIG' in sub_env):
+						sub_env['LD_LIBRARY_PATH'] = sub_env['LD_LIBRARY_PATH_ORIG']
+					elif('LD_LIBRARY_PATH' in sub_env):
 						del sub_env['LD_LIBRARY_PATH']
+					if(sys.platform == 'win32'):
+						ctypes.windll.kernel32.SetDllDirectoryW(None)
+
+					# execute procedure
 					proc = subprocess.Popen(
 						job['procedure'], shell=True, env=sub_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL
 					)
