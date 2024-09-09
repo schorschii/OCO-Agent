@@ -5,7 +5,7 @@ set -e
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 TARGET_DIRECTORY="$SCRIPTPATH/target"
 PRODUCT="OCO Agent"
-VERSION="1.1.1"
+VERSION="1.1.2"
 TARGET_FILENAME="oco-agent.pkg"
 DEVELOPER_ID_INSTALLER_CERT_NAME="Developer ID Installer: Georg Sieber (96G8V7UY3M)"
 #DEVELOPER_ACCOUNT_USERNAME=""
