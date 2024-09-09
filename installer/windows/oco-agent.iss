@@ -10,6 +10,7 @@
 #define AgentConfigFileName "oco-agent.ini"
 #define AgentConfigFilePath MyAppDir+"\"+AgentConfigFileName
 #define AgentApiEndpoint "/api-agent.php"
+#define ServiceName "oco-agent"
 
 [Setup]
 AppId={{7427E511-277A-45DC-B017-805A7F2FAB0F}
@@ -24,8 +25,9 @@ WizardImageFile="installer-side-img.bmp"
 WizardSmallImageFile="installer-top-img.bmp"
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon="{#MyAppDir}\oco-agent.exe,0"
-DefaultDirName={#MyAppDir}
+DefaultDirName={code:GetDefaultDirName}
 DisableDirPage=yes
+UsePreviousAppDir=no
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
@@ -51,16 +53,93 @@ Source: "..\..\oco-agent.dist.ini"; DestDir: "{app}"; DestName: "oco-agent.ini";
 Name: {app}\service-checks
 
 [UninstallDelete]
-Type: files; Name: "{app}\service-wrapper-old.exe"
-Type: files; Name: "{app}\oco-agent-old.exe"
-Type: filesandordirs; Name: "{app}.old"
+Type: filesandordirs; Name: "{#MyAppDir}"
+Type: filesandordirs; Name: "{#MyAppDir}.old"
+Type: filesandordirs; Name: "{#MyAppDir}.new"
 
 [Code]
+#ifdef UNICODE
+  #define AW "W"
+#else
+  #define AW "A"
+#endif
+
+const
+  SC_MANAGER_CONNECT = $0001;
+
+  SERVICE_QUERY_STATUS = $0004;
+
+  SERVICE_STOPPED = $00000001;
+  SERVICE_START_PENDING = $00000002;
+  SERVICE_STOP_PENDING = $00000003;
+  SERVICE_RUNNING = $00000004;
+  SERVICE_CONTINUE_PENDING = $00000005;
+  SERVICE_PAUSE_PENDING = $00000006;
+  SERVICE_PAUSED = $00000007;
+
+type
+  TSCHandle = THandle;
+
+  TServiceStatus = record
+    dwServiceType: DWORD;
+    dwCurrentState: DWORD;
+    dwControlsAccepted: DWORD;
+    dwWin32ExitCode: DWORD;
+    dwServiceSpecificExitCode: DWORD;
+    dwCheckPoint: DWORD;
+    dwWaitHint: DWORD;
+  end;
+
 var
   CustomQueryPage: TInputQueryWizardPage;
   ResultCode: Integer;
   InstallService: bool;
   DoNotStartService: bool;
+  RestartService: bool;
+
+function OpenService(hSCManager: TSCHandle; lpServiceName: string;
+  dwDesiredAccess: DWORD): TSCHandle;
+  external 'OpenService{#AW}@advapi32.dll stdcall';
+function OpenSCManager(lpMachineName: string; lpDatabaseName: string;
+  dwDesiredAccess: DWORD): TSCHandle;
+  external 'OpenSCManager{#AW}@advapi32.dll stdcall';
+function QueryServiceStatus(hService: TSCHandle;
+  out lpServiceStatus: TServiceStatus): BOOL;
+  external 'QueryServiceStatus@advapi32.dll stdcall';
+function CloseServiceHandle(hSCObject: TSCHandle): BOOL;
+  external 'CloseServiceHandle@advapi32.dll stdcall';
+
+function GetServiceState(const SvcName: string): DWORD;
+var
+  Status: TServiceStatus;
+  Manager: TSCHandle;
+  Service: TSCHandle;
+begin
+  // open service manager with the lowest required access rights for this task
+  Manager := OpenSCManager('', '', SC_MANAGER_CONNECT);
+  if Manager <> 0 then
+  try
+    // open service with the only required access right needed for this task
+    Service := OpenService(Manager, SvcName, SERVICE_QUERY_STATUS);
+    if Service <> 0 then
+    try
+      // and query service status
+      if QueryServiceStatus(Service, Status) then
+        Result := Status.dwCurrentState
+      else
+        RaiseException('QueryServiceStatus failed. ' + SysErrorMessage(DLLGetLastError));
+    finally
+      CloseServiceHandle(Service);
+    end
+    else
+      Result := SERVICE_STOPPED;
+      //RaiseException('OpenService failed. ' + SysErrorMessage(DLLGetLastError));
+  finally
+    CloseServiceHandle(Manager);
+  end
+  else
+    RaiseException('OpenSCManager failed. ' + SysErrorMessage(DLLGetLastError));
+end;
 
 function FileReplaceString(const FileName, SearchString, ReplaceString: string):boolean;
 var
@@ -127,47 +206,41 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     UninstallProgressForm.StatusLabel.Caption := 'Stopping and removing service...'
-    Exec(ExpandConstant('{app}\service-wrapper.exe'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec(ExpandConstant('{app}\service-wrapper.exe'), 'remove', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{#MyAppDir}\service-wrapper.exe'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{#MyAppDir}\service-wrapper.exe'), 'remove', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(1000); { without this delay, windows screams that files are still in use }
     UninstallProgressForm.StatusLabel.Caption := 'Removing files...'
   end;
 end;
 
+function GetDefaultDirName(Param: string): string;
+begin
+  if GetServiceState(ExpandConstant('{#ServiceName}')) <> SERVICE_STOPPED then
+    Result := ExpandConstant('{#MyAppDir}.new\')
+  else
+    Result := ExpandConstant('{#MyAppDir}\');
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ServerName: string;
+  app: string;
 begin
-  { agent update: stop and remove old service }
-  //if (CurStep = ssInstall) and FileExists(ExpandConstant('{app}\service-wrapper.exe')) then
-  //begin
-  //  Exec(ExpandConstant('{app}\service-wrapper.exe'), 'stop', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
-  //  Exec(ExpandConstant('{app}\service-wrapper.exe'), 'remove', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
-  //end;
-
-  { agent update: rename existing/running agent because files of a running program can not be removed (restart needed to use new agent version) }
   if CurStep = ssInstall then
   begin
-    { delete previous .old directory }
-    if DirExists(ExpandConstant('{app}.old\')) then
-    begin
-      DelTree(ExpandConstant('{app}.old\'), True, True, True)
-    end;
-    { rename current program folder to .old }
-    if DirExists(ExpandConstant('{app}\')) then
-    begin
-      RenameFile(ExpandConstant('{app}\'), ExpandConstant('{app}.old\'))
-      CreateDir(ExpandConstant('{app}\'))
-    end;
-    { move config file back }
-    if FileExists(ExpandConstant('{app}.old\{#AgentConfigFileName}')) then
-    begin
-      RenameFile(ExpandConstant('{app}.old\{#AgentConfigFileName}'), ExpandConstant('{#AgentConfigFilePath}'))
-    end;
-    { move service checks back }
-    if DirExists(ExpandConstant('{app}.old\service-checks')) then
-    begin
-      RenameFile(ExpandConstant('{app}.old\service-checks'), ExpandConstant('{app}\service-checks'))
+    try
+      { agent update: if service is running, install into dedicated .new directory and schedule restart because files of a running program can not be removed }
+      if GetServiceState(ExpandConstant('{#ServiceName}')) <> SERVICE_STOPPED then
+      begin
+        RestartService := true;
+        { delete previous .new directory }
+        if DirExists(ExpandConstant('{#MyAppDir}.new\')) then
+        begin
+          DelTree(ExpandConstant('{#MyAppDir}.new\'), True, True, True)
+        end;
+      end;
+    except
+      //MsgBox(GetExceptionMessage, mbError, MB_OK);
     end;
   end;
 
@@ -185,21 +258,49 @@ begin
       FileReplaceString(ExpandConstant('{#AgentConfigFilePath}'), 'AGENTKEY', CustomQueryPage.Values[1]);
     end;
 
+    if RestartService then
+    begin
+      { migrate config file }
+      if FileExists(ExpandConstant('{#MyAppDir}\{#AgentConfigFileName}')) then
+      begin
+        FileCopy(ExpandConstant('{#MyAppDir}\{#AgentConfigFileName}'), ExpandConstant('{#MyAppDir}.new\{#AgentConfigFileName}'), False)
+      end;
+      { migrate service checks }
+      if DirExists(ExpandConstant('{#MyAppDir}\service-checks')) then
+      begin
+        Exec('xcopy', ExpandConstant('"{#MyAppDir}\service-checks\*" "{#MyAppDir}.new\service-checks"'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+      end;
+      { hack: ensure that InnoSetup install path point sto normal directory, not .new }
+      RegWriteStringValue(HKEY_LOCAL_MACHINE, ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1'), 'QuietUninstallString', '"{#MyAppDir}\unins000.exe" /SILENT');
+      RegWriteStringValue(HKEY_LOCAL_MACHINE, ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1'), 'UninstallString', '"{#MyAppDir}\unins000.exe"');
+      RegWriteStringValue(HKEY_LOCAL_MACHINE, ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1'), 'InstallLocation', '"{#MyAppDir}\"');
+      RegWriteStringValue(HKEY_LOCAL_MACHINE, ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1'), 'Inno Setup: App Path', '"{#MyAppDir}"');
+    end;
+
     WizardForm.StatusLabel.Caption := 'Restrict permissions on agent config file...'
-    Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /inheritance:d', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('icacls', '"'+ExpandConstant('{#AgentConfigFilePath}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('icacls', '"'+ExpandConstant('{app}\{#AgentConfigFileName}')+'" /inheritance:d', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('icacls', '"'+ExpandConstant('{app}\{#AgentConfigFileName}')+'" /remove:g *S-1-5-32-545', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     { install and start services if it is a new installation }
     if InstallService then
     begin
       WizardForm.StatusLabel.Caption := 'Register service...'
-      Exec(ExpandConstant('{app}\service-wrapper.exe'), '--startup auto install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec(ExpandConstant('{#MyAppDir}\service-wrapper.exe'), '--startup auto install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
       { do not start service if corresponding parameter is set in .inf - for usage in $OEM$ Windows setup }
       if not DoNotStartService then
       begin
         WizardForm.StatusLabel.Caption := 'Start service...'
-        Exec(ExpandConstant('{app}\service-wrapper.exe'), 'start', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec(ExpandConstant('{#MyAppDir}\service-wrapper.exe'), 'start', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
+    end
+    else
+    begin
+      if RestartService then
+      begin
+        { schedule agent restart with .new directory movement - this must be done with ewNoWait for OCO self-update so that the job gracefully finishes before restarting the agent }
+        WizardForm.StatusLabel.Caption := 'Restarting service...'
+        Exec('cmd.exe', '/c ping -n 5 127.0.0.1 & net stop oco-agent & rd /s /q "C:\Program Files\OCO Agent" & move "C:\Program Files\OCO Agent.new" "C:\Program Files\OCO Agent" & net start oco-agent', '', SW_HIDE, ewNoWait, ResultCode);
       end;
     end;
   end;
