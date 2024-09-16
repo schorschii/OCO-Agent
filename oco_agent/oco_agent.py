@@ -962,10 +962,10 @@ def mainloop(args):
 						outBuffer += line
 						jobOutputReportThread.output = outBuffer
 					proc.stdout.close()
+					jobOutputReportThread.endEvent.set()
 					jobStatusRequest = jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_FINISHED, 'return-code': proc.wait(), 'message': guessEncodingAndDecode(outBuffer)
 					})
-					jobOutputReportThread.endEvent.set()
 
 					# check server's update_job_state response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
