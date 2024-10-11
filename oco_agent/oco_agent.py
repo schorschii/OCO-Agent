@@ -336,12 +336,15 @@ def getInstalledSoftware():
 				infoPlstPath = os.path.join(appdirname, appname, 'Contents', 'Info.plist')
 				if(not os.path.isfile(infoPlstPath)): continue
 				with open(infoPlstPath, 'rb') as f:
-					plist_data = plistlib.load(f)
-					software.append({
-						'name': plist_data.get('CFBundleName') or appname,
-						'version': plist_data.get('CFBundleVersion') or '?',
-						'description': plist_data.get('CFBundleGetInfoString') or '-'
-					})
+					try:
+						plist_data = plistlib.load(f)
+						software.append({
+							'name': plist_data.get('CFBundleName') or appname,
+							'version': plist_data.get('CFBundleVersion') or '?',
+							'description': plist_data.get('CFBundleGetInfoString') or '-'
+						})
+					except ValueError:
+						logger('Error parsing Info.plist of application:', infoPlstPath)
 	return software
 
 def getIsActivated():
