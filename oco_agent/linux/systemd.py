@@ -5,7 +5,7 @@ from .. import logger
 import time, re, json
 
 
-def getEvents(log, query, dateObjectSince, maxBatch, debug=False):
+def getEvents(query, dateObjectSince, maxBatch, debug=False):
 	foundEvents = []
 	startTime = time.time()
 	logger('Querying events from journalctl...')

@@ -20,52 +20,39 @@ import signal
 import threading
 import requests
 import json
-import socket
-import netifaces
-import platform
 import os, sys
 import configparser
 import argparse
-import psutil
 import atexit
-from psutil import virtual_memory
-import distro
+import psutil
 import time
 import datetime
 import tempfile
 import subprocess
-import shlex
-import pyedid
 from zipfile import ZipFile
 from dns import resolver, rdatatype
 
 
 ##### CONSTANTS #####
 
-from . import __version__, logger
+from . import __version__, logger, guessEncodingAndDecode
 EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+'/oco-agent.ini'
 LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
-SERVICE_CHECKS_PATH = EXECUTABLE_PATH+'/service-checks'
 OS_TYPE = sys.platform.lower()
 
 
 ##### OS SPECIFIC IMPORTS #####
 
 if 'win32' in OS_TYPE:
-	import wmi, winreg, ctypes
-	from win32com.client import GetObject
-	from .windows.event_log import getLogins as getLoginsWindows
-	from .windows.event_log import getEvents as getEventsWindows
+	import wmi, ctypes
+	from .windows import inventory
 
 elif 'linux' in OS_TYPE:
-	from .linux.utmp import getLogins as getLoginsLinux
-	from .linux.systemd import getEvents as getEventsLinux
-	SERVICE_CHECKS_PATH = '/usr/lib/oco-agent/service-checks'
+	from .linux import inventory
 
 elif 'darwin' in OS_TYPE:
-	import plistlib
-	from .macos.utmpx import getLogins as getLoginsMac
+	from .macos import inventory
 	# set OpenSSL path to macOS defaults
 	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
 	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
@@ -104,554 +91,6 @@ config = {
 }
 
 
-##### INVENTORY FUNCTIONS #####
-
-def getHostname():
-	hostname = socket.gethostname()
-	if(config['hostname-remove-domain'] and '.' in hostname):
-		hostname = hostname.split('.', 1)[0]
-	return hostname
-
-def getNics():
-	nics = []
-	mentionedMacs = []
-	for interface in netifaces.interfaces():
-		ifaddrs = netifaces.ifaddresses(interface)
-		interface = str(interface)
-		if(netifaces.AF_INET in ifaddrs):
-			for ineta in ifaddrs[netifaces.AF_INET]:
-				if(ineta['addr'] == '127.0.0.1'): continue
-				addr = ineta['addr']
-				netmask = ineta['netmask'] if 'netmask' in ineta else '-'
-				broadcast = ineta['broadcast'] if 'broadcast' in ineta else '-'
-				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
-					nics.append({'addr':addr, 'netmask':netmask, 'broadcast':broadcast, 'mac':'-', 'interface':interface})
-				else:
-					for ether in ifaddrs[netifaces.AF_LINK]:
-						mentionedMacs.append(ether['addr'])
-						nics.append({'addr':addr, 'netmask':netmask, 'broadcast':broadcast, 'mac':ether['addr'], 'interface':interface})
-		if(netifaces.AF_INET6 in ifaddrs):
-			for ineta in ifaddrs[netifaces.AF_INET6]:
-				if(ineta['addr'] == '::1'): continue
-				if(ineta['addr'].startswith('fe80')): continue
-				addr = ineta['addr']
-				netmask = ineta['netmask'] if 'netmask' in ineta else '-'
-				broadcast = ineta['broadcast'] if 'broadcast' in ineta else '-'
-				if(not netifaces.AF_LINK in ifaddrs or len(ifaddrs[netifaces.AF_LINK]) == 0):
-					nics.append({'addr':addr, 'netmask':netmask, 'broadcast':broadcast, 'mac':'-', 'interface':interface})
-				else:
-					for ether in ifaddrs[netifaces.AF_LINK]:
-						mentionedMacs.append(ether['addr'])
-						nics.append({'addr':addr, 'netmask':netmask, 'broadcast':broadcast, 'mac':ether['addr'], 'interface':interface})
-		if(netifaces.AF_LINK in ifaddrs):
-			for ether in ifaddrs[netifaces.AF_LINK]:
-				if(ether['addr'].strip() == ''): continue
-				if(ether['addr'].startswith('00:00:00:00:00:00')): continue
-				if(not ether['addr'] in mentionedMacs):
-					nics.append({'addr':'-', 'netmask':'-', 'broadcast':'-', 'mac':ether['addr'], 'interface':interface})
-	return nics
-
-def getOs():
-	if 'win32' in OS_TYPE:
-		try:
-			return f"Windows {platform.win32_ver()[0]} {platform.win32_edition()}"
-		except Error:
-			return platform.system()
-	elif 'linux' in OS_TYPE:
-		return distro.name()
-	elif 'darwin' in OS_TYPE:
-		return 'macOS'
-
-def getOsVersion():
-	if 'win32' in OS_TYPE:
-		return platform.win32_ver()[1]
-	elif 'linux' in OS_TYPE:
-		return distro.version()
-	elif 'darwin' in OS_TYPE:
-		return platform.mac_ver()[0]
-
-def getUptime():
-	return time.time() - psutil.boot_time()
-
-def getKernelVersion():
-	if 'win32' in OS_TYPE:
-		return '-'
-	elif 'linux' in OS_TYPE or 'darwin' in OS_TYPE:
-		return platform.release()
-
-def getMachineUid():
-	uid = ''
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_ComputerSystemProduct(): uid = o.UUID
-	elif 'linux' in OS_TYPE:
-		command = 'dmidecode -s system-uuid'
-		uid = os.popen(command).read().replace('\n','').replace('\t','').replace(' ','')
-	elif 'darwin' in OS_TYPE:
-		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
-		uid = os.popen(command).read().replace('\n','').replace('\t','').replace(' ','')
-	if uid.strip() == '': uid = getHostname() # fallback
-	return uid
-
-def getMachineSerial():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_Bios(): return o.SerialNumber
-	elif 'linux' in OS_TYPE:
-		command = 'dmidecode -s system-serial-number'
-	elif 'darwin' in OS_TYPE:
-		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/IOPlatformSerialNumber/{print $(NF-1)}'"
-	return os.popen(command).read().replace('\n','').replace('\t','').replace(' ','')
-
-def getMachineManufacturer():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_Bios(): return o.Manufacturer
-	elif 'linux' in OS_TYPE:
-		command = 'dmidecode -s system-manufacturer'
-	elif 'darwin' in OS_TYPE:
-		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/manufacturer/{print $(NF-1)}'"
-	return os.popen(command).read().replace('\n','').replace('\t','').replace(' ','')
-
-def getMachineModel():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_Computersystem(): return o.Model
-	elif 'linux' in OS_TYPE:
-		command = 'dmidecode -s system-product-name'
-	elif 'darwin' in OS_TYPE:
-		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/model/{print $(NF-1)}'"
-	return os.popen(command).read().replace('\n','').replace('\t','').replace(' ','')
-
-def getBiosVersion():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_Bios(): return o.Version
-	elif 'linux' in OS_TYPE:
-		command = 'dmidecode -s bios-version'
-	elif 'darwin' in OS_TYPE:
-		command = "ioreg -c IOPlatformExpertDevice -d 2 | awk -F\\\" '/version/{print $(NF-1)}'"
-	return os.popen(command).read().replace('\n','').replace('\t','').replace(' ','')
-
-def getUefiOrBios():
-	booted = '?'
-	if 'win32' in OS_TYPE:
-		command = 'bcdedit'
-		res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-		if res.returncode == 0:
-			booted = 'UEFI' if 'EFI' in guessEncodingAndDecode(res.stdout) else 'Legacy'
-	elif 'linux' in OS_TYPE:
-		booted = 'UEFI' if os.path.exists('/sys/firmware/efi') else 'Legacy'
-	elif 'darwin' in OS_TYPE:
-		booted = 'UEFI'
-	return booted
-
-def getSecureBootEnabled():
-	secureboot = '?'
-	if 'win32' in OS_TYPE:
-		try:
-			registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 'SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State', 0, winreg.KEY_READ)
-			value, regtype = winreg.QueryValueEx(registry_key, 'UEFISecureBootEnabled')
-			winreg.CloseKey(registry_key)
-			return str(value)
-		except WindowsError: return '0'
-	elif 'linux' in OS_TYPE:
-		command = 'mokutil --sb-state'
-		secureboot = '1' if 'enabled' in os.popen(command).read().replace('\t','').replace(' ','') else '0'
-	return secureboot
-
-def queryAppxPackages():
-	packages = []
-	try:
-		# this silently fails under Windows 7 and older since there is no Get-AppxPackage cmdlet and no AppX packages at all
-		result = subprocess.run(['powershell.exe', '-executionpolicy', 'bypass', '-command', 'Get-AppxPackage -allusers | select Name, Version, Publisher, PackageUserInformation | ConvertTo-Json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
-		resultDecoded = json.loads(result.stdout)
-		for package in resultDecoded:
-			packages.append({
-				'name': '[AppX] '+package['Name'],
-				'version': package['Version'],
-				'description': package['Publisher']
-			})
-	except Exception as e: pass
-	return packages
-def queryRegistrySoftware(key):
-	software = []
-	reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key, 0, winreg.KEY_READ)
-	ids = []
-	try:
-		count = 0
-		while True:
-			name = winreg.EnumKey(reg, count)
-			count = count + 1
-			ids.append(name)
-	except WindowsError: pass
-	winreg.CloseKey(reg)
-	for name in ids:
-		try:
-			reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key+'\\'+name, 0, winreg.KEY_READ)
-			displayName, regtype = winreg.QueryValueEx(reg, 'DisplayName')
-			displayVersion = ''
-			displayPublisher = ''
-			systemComponent = 0
-			try: displayVersion, regtype = winreg.QueryValueEx(reg, 'DisplayVersion')
-			except WindowsError: pass
-			try: displayPublisher, regtype = winreg.QueryValueEx(reg, 'Publisher')
-			except WindowsError: pass
-			try: systemComponent, regtype = winreg.QueryValueEx(reg, 'SystemComponent')
-			except WindowsError: pass
-			winreg.CloseKey(reg)
-			if(displayName.strip() == '' or systemComponent == 1): continue
-			software.append({
-				'name': displayName,
-				'version': displayVersion,
-				'description': displayPublisher
-			})
-		except WindowsError: pass
-	return software
-def getInstalledSoftware():
-	software = []
-	if 'win32' in OS_TYPE:
-		x64software = queryRegistrySoftware('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall')
-		x32software = queryRegistrySoftware('SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')
-		appXpackages = queryAppxPackages()
-		software = x32software + x64software + appXpackages
-	elif 'linux' in OS_TYPE:
-		command = 'apt list --installed'
-		for l in os.popen(command).read().split('\n'):
-			packageName = l.split('/')[0]
-			if(len(l.split(' ')) > 1):
-				packageVersion = l.split(' ')[1];
-				if(packageName != '' and packageVersion != ''):
-					software.append({
-						'name': packageName,
-						'version': packageVersion,
-						'description': ''
-					})
-	elif 'darwin' in OS_TYPE:
-		appdirname = '/Applications'
-		appdir = os.fsencode(appdirname)
-		for app in os.listdir(appdir):
-			appname = os.fsdecode(app)
-			if(not os.path.isfile(appname) and appname.endswith('.app')):
-				infoPlstPath = os.path.join(appdirname, appname, 'Contents', 'Info.plist')
-				if(not os.path.isfile(infoPlstPath)): continue
-				with open(infoPlstPath, 'rb') as f:
-					try:
-						plist_data = plistlib.load(f)
-						software.append({
-							'name': plist_data.get('CFBundleName') or appname,
-							'version': plist_data.get('CFBundleVersion') or '?',
-							'description': plist_data.get('CFBundleGetInfoString') or '-'
-						})
-					except ValueError:
-						logger('Error parsing Info.plist of application:', infoPlstPath)
-	return software
-
-def getIsActivated():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.SoftwareLicensingProduct():
-			if(o.ApplicationID == '55c92734-d682-4d71-983e-d6ec3f16059f'):
-				#print(o.Name)
-				#print(o.Description)
-				if(o.LicenseStatus == 1): return '1'
-		return '0'
-	else: return '-'
-
-def getLocale():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_OperatingSystem():
-			return o.Locale
-		return '?'
-	elif 'darwin' in OS_TYPE:
-		try:
-			command = 'osascript -e "user locale of (get system info)"'
-			return os.popen(command).read().strip()
-		except Exception as e: logger(e)
-	else: return '-'
-
-def getCpu():
-	if 'win32' in OS_TYPE:
-		return platform.processor()
-	elif 'linux' in OS_TYPE:
-		command = 'cat /proc/cpuinfo | grep "model name" | uniq'
-		return os.popen(command).read().split(':', 1)[1].strip()
-	elif 'darwin' in OS_TYPE:
-		command = 'sysctl -n machdep.cpu.brand_string'
-		return os.popen(command).read().strip()
-
-def getGpu():
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_VideoController(): return o.Name
-		return '?'
-	elif 'linux' in OS_TYPE:
-		return '?'
-	elif 'darwin' in OS_TYPE:
-		try:
-			command = 'system_profiler SPDisplaysDataType -json'
-			jsonstring = os.popen(command).read().strip()
-			jsondata = json.loads(jsonstring)
-			for gpu in jsondata['SPDisplaysDataType']:
-				return gpu['sppci_model']
-		except Exception as e: return '?'
-
-def getLinuxXAuthority():
-	try:
-		# LightDM
-		for i in range(10):
-			checkFile = '/var/run/lightdm/root/:'+str(i)
-			if(os.path.exists(checkFile)):
-				return {'file':checkFile, 'display':':'+str(i)}
-		# GDM
-		command = "who|grep -E '\(:[0-9](\.[0-9])*\)'|awk '{print $1$NF}'|sort -u"
-		for l in os.popen(command).read().split('\n'):
-			if(l.strip() == ''): continue
-			display = l.split('(')[1].split(')')[0]
-			username = l.split('(')[0]
-			userid = os.popen('id -u '+shlex.quote(username)).read().strip()
-			checkFile = '/run/user/'+str(int(userid))+'/gdm/Xauthority'
-			if(os.path.exists(checkFile)):
-				return {'file':checkFile, 'display':display}
-	except Exception as e:
-		logger('Unable to get X authority:', e)
-	return None
-def getScreens():
-	screens = []
-	if 'win32' in OS_TYPE:
-		try:
-			objWMI = GetObject(r'winmgmts:\\.\root\WMI').InstancesOf('WmiMonitorID')
-			for monitor in objWMI:
-				try:
-					devPath = monitor.InstanceName.split('_')[0]
-					regPath = f'SYSTEM\\CurrentControlSet\\Enum\\{devPath}\\Device Parameters'
-					registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, regPath, 0, winreg.KEY_READ)
-					edid, regtype = winreg.QueryValueEx(registry_key, 'EDID')
-					winreg.CloseKey(registry_key)
-					if not edid: continue
-					#print ('DEBUG: EDID Version: '+str(edid[18])+'.'+str(edid[19]))
-					#dtd = 54  # start byte of detailed timing desc.
-					# upper nibble of byte x 2^8 combined with full byte
-					#hres = ((edid[dtd+4] >> 4) << 8) | edid[dtd+2]
-					#vres = ((edid[dtd+7] >> 4) << 8) | edid[dtd+5]
-					edidp = pyedid.parse_edid(edid)
-					manufacturer = edidp.manufacturer or 'Unknown'
-					if(manufacturer == 'Unknown'): manufacturer += ' ('+str(edidp.manufacturer_id)+')'
-					screens.append({
-						'name': edidp.name,
-						'manufacturer': manufacturer,
-						'manufactured': str(edidp.year or '-'),
-						'resolution': str(edidp.resolutions[-1][0])+' x '+str(edidp.resolutions[-1][1]) if edidp.resolutions else '-',
-						'size': str(edidp.width)+' x '+str(edidp.height),
-						'type': str(edidp.product_id or '-'),
-						'serialno': edidp.serial or '-',
-						'technology': str(edidp.type or '-')
-					})
-				except Exception as e: logger('Unable to get screen details:', e)
-		except Exception as e: logger('Unable to get attached screens:', e)
-	elif 'linux' in OS_TYPE:
-		try:
-			xAuthority = getLinuxXAuthority()
-			if(xAuthority != None):
-				os.environ['XAUTHORITY'] = xAuthority['file']
-				os.environ['DISPLAY'] = xAuthority['display']
-			randr = subprocess.check_output(['xrandr', '--verbose'])
-			for edid in pyedid.get_edid_from_xrandr_verbose(randr):
-				try:
-					edidp = pyedid.parse_edid(edid)
-					manufacturer = edidp.manufacturer or 'Unknown'
-					if(manufacturer == 'Unknown'): manufacturer += ' ('+str(edidp.manufacturer_id)+')'
-					screens.append({
-						'name': edidp.name,
-						'manufacturer': manufacturer,
-						'manufactured': str(edidp.year or '-'),
-						'resolution': str(edidp.resolutions[-1][0])+' x '+str(edidp.resolutions[-1][1]) if edidp.resolutions else '-',
-						'size': str(edidp.width)+' x '+str(edidp.height),
-						'type': str(edidp.product_id or '-'),
-						'serialno': edidp.serial or '-',
-						'technology': str(edidp.type or '-')
-					})
-				except Exception as e: logger('Unable to get screen details:', e)
-		except Exception as e: logger('Unable to get attached screens:', e)
-	elif 'darwin' in OS_TYPE:
-		try:
-			command = 'system_profiler SPDisplaysDataType -json'
-			jsonstring = os.popen(command).read().strip()
-			jsondata = json.loads(jsonstring)
-			for gpu in jsondata['SPDisplaysDataType']:
-				for screen in gpu['spdisplays_ndrvs']:
-					try:
-						edidp = pyedid.parse_edid(screen['_spdisplays_edid'].replace('0x',''))
-						manufacturer = edidp.manufacturer or 'Unknown'
-						resolution = '-' # MacBook internal screens do not provide resolution data :'(
-						if(manufacturer == 'Unknown'): manufacturer += ' ('+str(edidp.manufacturer_id)+')'
-						if(len(edidp.resolutions) > 0): resolution = str(edidp.resolutions[-1][0])+' x '+str(edidp.resolutions[-1][1])
-						screens.append({
-							'name': edidp.name,
-							'manufacturer': manufacturer,
-							'manufactured': str(edidp.year or '-'),
-							'resolution': resolution,
-							'size': str(edidp.width)+' x '+str(edidp.height),
-							'type': str(edidp.product_id or '-'),
-							'serialno': edidp.serial or '-',
-							'technology': str(edidp.type or '-')
-						})
-					except Exception as e: logger('Unable to get screen details:', e)
-		except Exception as e: logger('Unable to get attached screens:', e)
-	return screens
-
-def winPrinterStatus(status, state):
-	if(state == 2): return 'Error'
-	if(state == 8): return 'Paper Jam'
-	if(state == 16): return 'Out Of Paper'
-	if(state == 64): return 'Paper Problem'
-	if(state == 131072): return 'Toner Low'
-	if(state == 262144): return 'No Toner'
-	if(status == 1): return 'Other'
-	if(status == 3): return 'Idle'
-	if(status == 4): return 'Printing'
-	if(status == 5): return 'Warmup'
-	if(status == 6): return 'Stopped'
-	if(status == 7): return 'Offline'
-	return 'Unknown'
-def getPrinters():
-	printers = []
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for o in w.Win32_Printer():
-			printers.append({
-				'name': o.Name,
-				'driver': o.DriverName,
-				'paper': '' if o.PrinterPaperNames == None else ', '.join(o.PrinterPaperNames),
-				'dpi': o.HorizontalResolution,
-				'uri': o.PortName,
-				'status': winPrinterStatus(o.PrinterStatus, o.PrinterState)
-			})
-	elif 'linux' in OS_TYPE or 'darwin' in OS_TYPE:
-		CUPS_CONFIG = '/etc/cups/printers.conf'
-		if(not os.path.exists(CUPS_CONFIG)): return printers
-		with open(CUPS_CONFIG, 'r', encoding='utf-8', errors='replace') as file:
-			printer = {'name': '', 'driver': '', 'paper': '', 'dpi': '', 'uri': '', 'status': ''}
-			for line in file:
-				l = line.rstrip('\n')
-				if(l.startswith('<DefaultPrinter ') or l.startswith('<Printer ')):
-					printer = {
-						'name': l.split(' ', 1)[1].rstrip('>'),
-						'driver': '', 'paper': '', 'dpi': '', 'uri': '', 'status': ''
-					}
-				if(l.startswith('MakeModel ')):
-					printer['driver'] = l.split(' ', 1)[1]
-				if(l.startswith('DeviceURI ')):
-					printer['uri'] = l.split(' ', 1)[1]
-				if(l.startswith('</DefaultPrinter>') or l.startswith('</Printer>')):
-					if(printer['name'] != ''): printers.append(printer)
-	return printers
-
-def getPartitions():
-	partitions = []
-	if 'win32' in OS_TYPE:
-		w = wmi.WMI()
-		for ld in w.Win32_LogicalDisk():
-			devicePath = '?'
-			for v in w.Win32_Volume():
-				if(v.DriveLetter == ld.DeviceID):
-					devicePath = v.DeviceID
-			partitions.append({
-				'device': devicePath,
-				'mountpoint': ld.DeviceID,
-				'filesystem': ld.FileSystem,
-				'name': ld.VolumeName,
-				'size': ld.Size,
-				'free': ld.FreeSpace,
-				'serial': ld.VolumeSerialNumber
-			})
-	elif 'linux' in OS_TYPE:
-		command = 'df -k --output=used,avail,fstype,source,target'
-		lines = os.popen(command).read().strip().splitlines()
-		first = True
-		for line in lines:
-			if(first): first = False; continue
-			values = ' '.join(line.split()).split()
-			if(len(values) != 5): continue
-			if(values[2] == 'tmpfs' or values[2] == 'devtmpfs'): continue
-			partitions.append({
-				'device': values[3],
-				'mountpoint': values[4],
-				'filesystem': values[2],
-				'size': (int(values[0])+int(values[1]))*1024,
-				'free': int(values[1])*1024,
-				'name': '',
-				'serial': ''
-			})
-	elif 'darwin' in OS_TYPE:
-		command = 'df -k'
-		lines = os.popen(command).read().strip().splitlines()
-		first = True
-		for line in lines:
-			if(first): first = False; continue
-			values = ' '.join(line.split()).split()
-			if(len(values) != 9): continue
-			if(values[0] == 'devfs'): continue
-			partitions.append({
-				'device': values[0],
-				'mountpoint': values[8],
-				'filesystem': '',
-				'size': (int(values[2])+int(values[3]))*1024,
-				'free': int(values[3])*1024,
-				'name': '',
-				'serial': ''
-			})
-	return partitions
-
-def getLogins(since):
-	logins = []
-	try:
-		# server's `since` value is in UTC
-		dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
-		if 'win32' in OS_TYPE:
-			logins = getLoginsWindows(dateObjectSince, config['windows']['username-with-domain'])
-		elif 'linux' in OS_TYPE:
-			logins = getLoginsLinux(dateObjectSince)
-		elif 'darwin' in OS_TYPE:
-			logins = getLoginsMac(dateObjectSince)
-	except Exception as e:
-		logger('Error reading logins:', e)
-	return logins
-
-def getEvents(log, query, since):
-	maxBatch = 10000
-	events = []
-	try:
-		dateObjectSince = datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S')
-		if 'win32' in OS_TYPE:
-			events = getEventsWindows(log, query, dateObjectSince, maxBatch, debug=config['debug'])
-		elif 'linux' in OS_TYPE and log == 'journalctl':
-			events = getEventsLinux(log, query, dateObjectSince, maxBatch, debug=config['debug'])
-	except Exception as e:
-		logger('Error reading events:', e)
-	return events
-
-def getServiceStatus():
-	services = []
-	if not os.path.exists(SERVICE_CHECKS_PATH): return
-	for file in [f for f in os.listdir(SERVICE_CHECKS_PATH) if os.path.isfile(os.path.join(SERVICE_CHECKS_PATH, f))]:
-		serviceScriptPath = os.path.join(SERVICE_CHECKS_PATH, file)
-		startTime = time.time()
-		logger('Executing service check script '+serviceScriptPath+'...')
-		res = subprocess.run(serviceScriptPath, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-		# example output (CheckMK format): 0 "My service" myvalue=73;80;90 My output text
-		# https://docs.checkmk.com/latest/de/localchecks.html
-		for line in guessEncodingAndDecode(res.stdout).splitlines():
-			values = shlex.split(line)
-			if(len(values) < 4):
-				print('  invalid output from script: '+line)
-				continue
-			services.append({'status':values[0], 'name':values[1], 'merics':values[2], 'details':' '.join(values[3:])})
-		if(config['debug']): print('  took '+str(time.time()-startTime))
-	return services
-
-
 ##### AGENT-SERVER COMMUNICATION FUNCTIONS #####
 JOB_STATE_ERROR       = -1
 JOB_STATE_DOWNLOADING = 1
@@ -682,6 +121,7 @@ def downloadFile(url, params, path, jobId):
 						})
 
 def jsonRequest(method, data):
+	i = inventory.Inventory(config)
 	headers = {'content-type': 'application/json'}
 	data = {
 		'jsonrpc': '2.0',
@@ -689,7 +129,7 @@ def jsonRequest(method, data):
 		'method': method,
 		'params': {
 			'uid': config['machine-uid'],
-			'hostname': getHostname(),
+			'hostname': i.getHostname(),
 			'agent-key': config['agent-key'],
 			'data': data
 		}
@@ -718,7 +158,7 @@ def jsonRequest(method, data):
 
 def isUserLoggedIn():
 	if 'win32' in OS_TYPE:
-		w=wmi.WMI()
+		w = wmi.WMI()
 		for u in w.Win32_Process(Name='explorer.exe'):
 			return True
 	elif 'linux' in OS_TYPE:
@@ -738,13 +178,6 @@ def removeAll(path):
 		for name in dirs:
 			os.rmdir(os.path.join(root, name))
 	os.rmdir(path)
-
-def guessEncodingAndDecode(textBytes, codecs=['utf-8', 'cp1252', 'cp850']):
-	for codec in codecs:
-		try:
-			return textBytes.decode(codec)
-		except UnicodeDecodeError: pass
-	return textBytes.decode(sys.stdout.encoding, 'replace') # fallback: replace invalid characters
 
 def jobOutputReporter(jobId):
 	delay = config['report-job-output']
@@ -818,14 +251,15 @@ def daemon(args):
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
 def mainloop(args):
 	global restartFlag, configParser
+	i = inventory.Inventory(config)
 
 	# send initial request
 	logger('Sending agent_hello...')
 	request = jsonRequest('oco.agent.hello', {
 		'agent_version': __version__,
-		'networks': getNics(),
-		'services': getServiceStatus(),
-		'uptime': getUptime()
+		'networks': i.getNics(),
+		'services': i.getServiceStatus(),
+		'uptime': i.getUptime()
 	})
 
 	# check response
@@ -854,37 +288,39 @@ def mainloop(args):
 			config['agent-key'] = configParser.get('agent', 'agent-key')
 
 		# send computer info if requested
-		loginsSince = '2000-01-01 00:00:00'
-		if('logins-since' in responseJson['result']['params']):
-			loginsSince = responseJson['result']['params']['logins-since']
 		if(responseJson['result']['params']['update'] == 1):
 			logger('Updating inventory data...')
+
+			since = '2000-01-01 00:00:00'
+			if('logins-since' in responseJson['result']['params']):
+				since = responseJson['result']['params']['logins-since']
+			logins = i.getLogins(datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc))
 			jsonRequest('oco.agent.update', {
-				'hostname': getHostname(),
+				'hostname': i.getHostname(),
 				'agent_version': __version__,
-				'os': getOs(),
-				'os_version': getOsVersion(),
-				'os_license': getIsActivated(),
-				'os_language': getLocale(),
-				'kernel_version': getKernelVersion(),
-				'architecture': platform.machine(),
-				'cpu': getCpu(),
-				'ram': virtual_memory().total,
-				'gpu': getGpu(),
-				'serial': getMachineSerial(),
-				'manufacturer': getMachineManufacturer(),
-				'model': getMachineModel(),
-				'bios_version': getBiosVersion(),
-				'uptime': getUptime(),
-				'boot_type': getUefiOrBios(),
-				'secure_boot': getSecureBootEnabled(),
-				'domain': socket.getfqdn(),
-				'networks': getNics(),
-				'screens': getScreens(),
-				'printers': getPrinters(),
-				'partitions': getPartitions(),
-				'software': getInstalledSoftware(),
-				'logins': getLogins(loginsSince),
+				'os': i.getOs(),
+				'os_version': i.getOsVersion(),
+				'os_license': i.getIsActivated(),
+				'os_language': i.getLocale(),
+				'kernel_version': i.getKernelVersion(),
+				'architecture': i.getArchitecture(),
+				'cpu': i.getCpu(),
+				'ram': i.getRam(),
+				'gpu': i.getGpu(),
+				'serial': i.getMachineSerial(),
+				'manufacturer': i.getMachineManufacturer(),
+				'model': i.getMachineModel(),
+				'bios_version': i.getBiosVersion(),
+				'uptime': i.getUptime(),
+				'boot_type': i.getUefiOrBios(),
+				'secure_boot': i.getSecureBootEnabled(),
+				'domain': i.getDomain(),
+				'networks': i.getNics(),
+				'screens': i.getScreens(),
+				'printers': i.getPrinters(),
+				'partitions': i.getPartitions(),
+				'software': i.getInstalledSoftware(),
+				'logins': logins,
 			})
 
 		# execute jobs if requested
@@ -924,7 +360,7 @@ def mainloop(args):
 						})
 						downloadFile(
 							config['api-url'],
-							{'uid': config['machine-uid'], 'hostname': getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id']},
+							{'uid': config['machine-uid'], 'hostname': i.getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id']},
 							tempZipPath,
 							job['id']
 						)
@@ -1029,10 +465,15 @@ def mainloop(args):
 
 		# send events from logs if requested
 		if('events' in responseJson['result']['params']):
+			i = inventory.Inventory(config)
 			events = []
 			for eventQuery in responseJson['result']['params']['events']:
-				if not 'log' in eventQuery or not 'query' in eventQuery or not 'since' in eventQuery: continue
-				events += getEvents(eventQuery['log'], eventQuery['query'], eventQuery['since'])
+				try:
+					if(not 'log' in eventQuery or not 'query' in eventQuery or not 'since' in eventQuery): continue
+					dateObjectSince = datetime.datetime.strptime(eventQuery['since'], '%Y-%m-%d %H:%M:%S')
+					events += i.getEvents(eventQuery['log'], eventQuery['query'], dateObjectSince)
+				except Exception as e:
+					logger('Error reading events:', e)
 			if(len(events) > 0):
 				jsonRequest('oco.agent.events', {'events':events})
 
@@ -1052,6 +493,7 @@ def main():
 		logger('OCO Agent starting with config file: '+configFilePath+' ...')
 
 		# read config
+		i = inventory.Inventory(config)
 		configParser.read(configFilePath)
 		if(configParser.has_section('agent')):
 			config['debug'] = (int(configParser['agent'].get('debug', config['debug'])) == 1)
@@ -1063,7 +505,7 @@ def main():
 			config['report-frames'] = int(configParser['agent'].get('report-frames', config['report-frames']))
 			config['report-job-output'] = int(configParser['agent'].get('report-job-output', config['report-job-output']))
 			config['agent-key'] = configParser['agent'].get('agent-key', config['agent-key'])
-			config['machine-uid'] = configParser['agent'].get('machine-uid', getMachineUid())
+			config['machine-uid'] = configParser['agent'].get('machine-uid', i.getMachineUid())
 		if(configParser.has_section('server')):
 			config['api-url'] = configParser['server'].get('api-url', config['api-url'])
 			config['server-key'] = configParser['server'].get('server-key', config['server-key'])

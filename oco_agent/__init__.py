@@ -11,3 +11,10 @@ import datetime
 
 def logger(*text):
 	print('['+str(datetime.datetime.now())+']', *text)
+
+def guessEncodingAndDecode(textBytes, codecs=['utf-8', 'cp1252', 'cp850']):
+	for codec in codecs:
+		try:
+			return textBytes.decode(codec)
+		except UnicodeDecodeError: pass
+	return textBytes.decode(sys.stdout.encoding, 'replace') # fallback: replace invalid characters
