@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+
+import subprocess
+from shutil import which
+from crypt import crypt
+
+from .. import base_password_rotation, logger
+
+
+class PasswordRotation(base_password_rotation.BasePasswordRotation):
+
+	def updatePassword(self, username, newPassword):
+		# check if usermod is in PATH
+		if(which('usermod') is None):
+			raise Exception('usermod is not in PATH')
+
+		# generate new values
+		newPasswordHashed = crypt(newPassword)
+
+		# update password in local database
+		cmd = ['usermod', '-p', newPasswordHashed, username]
+		res = subprocess.run(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+		if res.returncode == 0:
+			logger('Changed password of user "'+username+'" locally')
+		else:
+			raise Exception(' '.join(cmd)+' returned non-zero exit code '+str(res.returncode))

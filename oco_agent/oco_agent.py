@@ -46,13 +46,13 @@ OS_TYPE = sys.platform.lower()
 
 if 'win32' in OS_TYPE:
 	import wmi, ctypes
-	from .windows import inventory
+	from .windows import inventory, password_rotation
 
 elif 'linux' in OS_TYPE:
-	from .linux import inventory
+	from .linux import inventory, password_rotation
 
 elif 'darwin' in OS_TYPE:
-	from .macos import inventory
+	from .macos import inventory, password_rotation
 	# set OpenSSL path to macOS defaults
 	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
 	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
@@ -120,7 +120,7 @@ def downloadFile(url, params, path, jobId):
 							'message': ''
 						})
 
-def jsonRequest(method, data):
+def jsonRequest(method, data, throw=False):
 	i = inventory.Inventory(config)
 	headers = {'content-type': 'application/json'}
 	data = {
@@ -136,22 +136,22 @@ def jsonRequest(method, data):
 	}
 	data_json = json.dumps(data)
 
+	response = None
 	try:
 		# send request
 		if(config['debug']): logger('< ' + data_json)
 		response = requests.post(config['api-url'], data=data_json, headers=headers, timeout=(config['connection-timeout'],config['read-timeout']))
 
-		# print response
+		# check response
 		if(config['debug']): logger('> (' + str(response.elapsed.total_seconds()) + 's) [' + str(response.status_code) + '] ' + response.text)
 		if(response.status_code != 200):
-			logger('Request failed with HTTP status code ' + str(response.status_code))
-
-		# return response
-		return response
+			raise Exception('Request failed with HTTP status code ' + str(response.status_code))
 
 	except Exception as e:
-		logger(e)
-		return None
+		if(throw): raise Exception(e)
+		else: logger(e)
+
+	return response
 
 
 ##### VARIOUS AGENT FUNCTIONS #####
@@ -476,6 +476,23 @@ def mainloop(args):
 					logger('Error reading events:', e)
 			if(len(events) > 0):
 				jsonRequest('oco.agent.events', {'events':events})
+
+		# update admin password if requested
+		if('update-passwords' in responseJson['result']['params']):
+			pwr = password_rotation.PasswordRotation()
+			newPasswords = []
+			try:
+				for item in responseJson['result']['params']['update-passwords']:
+					newPassword = pwr.generatePassword(item['alphabet'], item['length'])
+					newPasswords.append({'username':item['username'], 'password':newPassword})
+				jsonRequest('oco.agent.passwords', {'passwords':newPasswords}, True)
+				for item in newPasswords:
+					pwr.updatePassword(item['username'], item['password'])
+			except Exception as e:
+				import traceback
+				print(traceback.format_exc())
+				logger('Unable to rotate password:', e)
+
 
 def signal_handler(signum, frame):
 	global exitEvent
