@@ -485,13 +485,21 @@ def mainloop(args):
 				for item in responseJson['result']['params']['update-passwords']:
 					newPassword = pwr.generatePassword(item['alphabet'], item['length'])
 					newPasswords.append({'username':item['username'], 'password':newPassword})
+				# store the new passwords on the server
 				jsonRequest('oco.agent.passwords', {'passwords':newPasswords}, True)
+				# change them locally - only if jsonRequest succeeded to be sure that new passwords do not get lost
 				for item in newPasswords:
-					pwr.updatePassword(item['username'], item['password'])
+					try:
+						pwr.updatePassword(item['username'], item['password'])
+					except Exception as e2:
+						# in case of failure, e.g. user does not exist, we need revoke the password on the server
+						logger('Unable to rotate password for '+str(item['username'])+':', e2, '(trying to revoke)')
+						try:
+							jsonRequest('oco.agent.passwords', {'passwords':[{'username':item['username'], 'password':item['password'], 'revoke':True}]}, True)
+						except Exception as e3:
+							logger('Unable to revoke password for '+str(item['username'])+':', e3)
 			except Exception as e:
-				import traceback
-				print(traceback.format_exc())
-				logger('Unable to rotate password:', e)
+				logger('Password rotation error:', e)
 
 
 def signal_handler(signum, frame):
