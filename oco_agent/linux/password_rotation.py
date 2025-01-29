@@ -9,7 +9,7 @@ from .. import base_password_rotation, logger
 
 class PasswordRotation(base_password_rotation.BasePasswordRotation):
 
-	def updatePassword(self, username, newPassword):
+	def updatePassword(self, username, newPassword, oldPassword=None):
 		# check if usermod is in PATH
 		if(which('usermod') is None):
 			raise Exception('usermod is not in PATH')
