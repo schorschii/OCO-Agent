@@ -259,7 +259,9 @@ def mainloop(args):
 		'agent_version': __version__,
 		'networks': i.getNics(),
 		'services': i.getServiceStatus(),
-		'uptime': i.getUptime()
+		'uptime': i.getUptime(),
+		'battery_level': i.getBatteryLevel(),
+		'battery_status': i.getBatteryStatus(),
 	})
 
 	# check response
@@ -321,6 +323,9 @@ def mainloop(args):
 				'partitions': i.getPartitions(),
 				'software': i.getInstalledSoftware(),
 				'logins': logins,
+				'battery_level': i.getBatteryLevel(),
+				'battery_status': i.getBatteryStatus(),
+				'devices': i.getUsbDevices(),
 			})
 
 		# execute jobs if requested

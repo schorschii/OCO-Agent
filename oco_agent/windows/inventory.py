@@ -337,3 +337,23 @@ class Inventory(base_inventory.BaseInventory):
 				'serial': ld.VolumeSerialNumber
 			})
 		return partitions
+
+	def getUsbDevices(self):
+		devices = []
+		w = wmi.WMI()
+		for o in w.Win32_USBControllerDevice():
+			try:
+				deviceIds = o.Dependent.DeviceID.split('\\')
+				if(len(deviceIds) != 3): continue
+				deviceIds2 = deviceIds[1].split('&')
+				if(len(deviceIds2) != 2): continue
+				devices.append({
+					'subsystem': 'usb',
+					'vendor': int(deviceIds2[0][4:], 16),
+					'product': int(deviceIds2[1][4:], 16),
+					'serial': deviceIds[2],
+					'name': o.Dependent.Name
+				})
+			except Exception as e:
+				logger('Error reading USB device:', e)
+		return devices

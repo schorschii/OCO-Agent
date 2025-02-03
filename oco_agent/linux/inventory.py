@@ -8,6 +8,7 @@ import distro
 import utmp
 import datetime
 import platform
+import usb
 
 from . import systemd, cups
 from .. import base_inventory, logger
@@ -180,3 +181,18 @@ class Inventory(base_inventory.BaseInventory):
 				'serial': ''
 			})
 		return partitions
+
+	def getUsbDevices(self):
+		devices = []
+		for dev in usb.core.find(find_all=True):
+			try:
+				devices.append({
+					'subsystem': 'usb',
+					'vendor': dev.idVendor,
+					'product': dev.idProduct,
+					'serial': usb.util.get_string(dev, dev.iSerialNumber),
+					'name': usb.util.get_string(dev, dev.iProduct)
+				})
+			except Exception as e:
+				logger('Error reading USB device:', e)
+		return devices

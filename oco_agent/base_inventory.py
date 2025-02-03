@@ -78,6 +78,17 @@ class BaseInventory:
 	def getUptime(self):
 		return time.time() - psutil.boot_time()
 
+	def getBatteryLevel(self):
+		battery = psutil.sensors_battery()
+		if(not battery): return False
+		return battery.percent / 100
+
+	def getBatteryStatus(self):
+		battery = psutil.sensors_battery()
+		if(not battery): return False
+		if(battery.power_plugged): return 1
+		else: return 2
+
 	def getServiceStatus(self):
 		services = []
 		if not os.path.exists(self.SERVICE_CHECKS_PATH): return

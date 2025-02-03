@@ -9,6 +9,10 @@ pip-system-certs==4.0
 
 # Linux specific
 utmp; sys_platform == "linux"
+pyusb; sys_platform == "linux"
+
+# macOS specific
+pyusb; sys_platform == "darwin"
 
 # Windows specific
 wmi; sys_platform == "win32"
