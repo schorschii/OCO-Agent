@@ -156,7 +156,17 @@ class Inventory(base_inventory.BaseInventory):
 		return os.popen(command).read().split(':', 1)[1].strip()
 
 	def getGpu(self):
-		return '?' # not implemented
+		cards = []
+		envpath = os.environ['PATH']
+		os.environ['PATH'] = envpath + ':/usr/local/sbin:/usr/sbin:/sbin'
+		command = 'lspci'
+		for card in os.popen(command).read().strip().splitlines():
+			for prefix in ['VGA compatible controller:', '3D controller:']:
+				if prefix in card:
+					cardName = card.split(prefix)[1].split('(rev')[0].strip()
+					cards.append(cardName)
+		os.environ['PATH'] = envpath
+		return ', '.join(cards)
 
 	def getPrinters(self):
 		return cups.getPrinters()
