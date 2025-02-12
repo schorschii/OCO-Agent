@@ -29,6 +29,7 @@ import time
 import datetime
 import tempfile
 import subprocess
+import hmac, hashlib
 from zipfile import ZipFile
 from dns import resolver, rdatatype
 
@@ -97,8 +98,27 @@ JOB_STATE_DOWNLOADING = 1
 JOB_STATE_EXECUTING   = 2
 JOB_STATE_FINISHED    = 3
 
-def downloadFile(url, params, path, jobId):
-	with requests.get(url, params=params, stream=True, timeout=(config['connection-timeout'],config['read-timeout'])) as r:
+def downloadFile(url, packageId, path, jobId):
+	i = inventory.Inventory(config)
+	data = {
+		'jsonrpc': '2.0',
+		'id': 1,
+		'method': 'oco.agent.download',
+		'params': {
+			'uid': config['machine-uid'],
+			'hostname': i.getHostname(),
+			'timestamp': time.time(),
+			'package-id': packageId,
+		}
+	}
+	data_json = json.dumps(data)
+	headers = {
+		'content-type': 'application/json',
+		'x-oco-agent-signature': hmac.new(config['agent-key'].encode('utf-8'), data_json.encode('utf-8'), hashlib.sha256).hexdigest()
+	}
+
+	with requests.get(url, stream=True, data=data_json, headers=headers,
+		timeout=(config['connection-timeout'],config['read-timeout'])) as r:
 		r.raise_for_status()
 		totalLength = r.headers.get('content-length')
 		if(totalLength): totalLength = int(totalLength)
@@ -120,9 +140,8 @@ def downloadFile(url, params, path, jobId):
 							'message': ''
 						})
 
-def jsonRequest(method, data, throw=False):
+def jsonRequest(method, data, throw=True):
 	i = inventory.Inventory(config)
-	headers = {'content-type': 'application/json'}
 	data = {
 		'jsonrpc': '2.0',
 		'id': 1,
@@ -130,11 +149,15 @@ def jsonRequest(method, data, throw=False):
 		'params': {
 			'uid': config['machine-uid'],
 			'hostname': i.getHostname(),
-			'agent-key': config['agent-key'],
+			'timestamp': time.time(),
 			'data': data
 		}
 	}
 	data_json = json.dumps(data)
+	headers = {
+		'content-type': 'application/json',
+		'x-oco-agent-signature': hmac.new(config['agent-key'].encode('utf-8'), data_json.encode('utf-8'), hashlib.sha256).hexdigest()
+	}
 
 	response = None
 	try:
@@ -146,6 +169,15 @@ def jsonRequest(method, data, throw=False):
 		if(config['debug']): logger('> (' + str(response.elapsed.total_seconds()) + 's) [' + str(response.status_code) + '] ' + response.text)
 		if(response.status_code != 200):
 			raise Exception('Request failed with HTTP status code ' + str(response.status_code))
+
+		# check server signature if set in agent config
+		if(config['server-key']):
+			if('x-oco-server-signature' not in response.headers):
+				raise Exception('Missing server signature')
+			if(response.headers['x-oco-server-signature'] != hmac.new(config['server-key'].encode('utf-8'), response.text.encode('utf-8'), hashlib.sha256).hexdigest()):
+				raise Exception('Invalid server signature '+response.headers['x-oco-server-signature']+' - check server_key')
+		else:
+			logger('Warning: no server-key set in agent config file - blindly trusting the server')
 
 	except Exception as e:
 		if(throw): raise Exception(e)
@@ -242,8 +274,8 @@ def daemon(args):
 	while not exitEvent.is_set():
 		try:
 			mainloop(args)
-		except KeyError as e:
-			logger('KeyError:', e)
+		except Exception as e:
+			logger(type(e).__name__+':', e)
 		logger('Running in daemon mode. Waiting '+str(config['query-interval'])+' seconds to send next request.')
 		exitEvent.wait(config['query-interval'])
 
@@ -269,20 +301,17 @@ def mainloop(args):
 		responseJson = request.json()
 
 		# save server key if server key is not already set in local config
-		if(config['server-key'] == None or config['server-key'] == ''):
+		if('server-key' in responseJson['result']['params']
+		and (config['server-key'] == None or config['server-key'] == '')):
 			logger('Write new config with updated server key...')
 			if(not configParser.has_section('server')): configParser.add_section('server')
 			configParser.set('server', 'server-key', responseJson['result']['params']['server-key'])
 			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
 			config['server-key'] = configParser.get('server', 'server-key')
 
-		# check server key
-		if(config['server-key'] != responseJson['result']['params']['server-key']):
-			logger('!!! Invalid server key, abort.')
-			return
-
 		# update agent key if requested
-		if(responseJson['result']['params']['agent-key'] != None):
+		if('agent-key' in responseJson['result']['params']
+		and responseJson['result']['params']['agent-key'] != None):
 			logger('Write new config with updated agent key...')
 			if(not configParser.has_section('agent')): configParser.add_section('agent')
 			configParser.set('agent', 'agent-key', responseJson['result']['params']['agent-key'])
@@ -342,7 +371,7 @@ def mainloop(args):
 					logger('Software Job '+str(job['id'])+': prodecure is empty - do nothing but send success message to server.')
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_FINISHED, 'return-code': 0, 'message': ''
-					})
+					}, False)
 					continue
 				if(restartFlag == True):
 					logger('Skipping Software Job '+str(job['id'])+' because restart flag is set.')
@@ -362,16 +391,13 @@ def mainloop(args):
 						logger('Downloading into '+tempZipPath+'...')
 						jsonRequest('oco.agent.update_job_state', {
 							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 0, 'message': ''
-						})
+						}, False)
 						downloadFile(
-							config['api-url'],
-							{'uid': config['machine-uid'], 'hostname': i.getHostname(), 'agent-key': config['agent-key'], 'id': job['package-id']},
-							tempZipPath,
-							job['id']
+							config['api-url'], job['package-id'], tempZipPath, job['id']
 						)
 						jsonRequest('oco.agent.update_job_state', {
 							'job-id': job['id'], 'state': JOB_STATE_DOWNLOADING, 'return-code': None, 'download-progress': 101, 'message': ''
-						})
+						}, False)
 						with ZipFile(tempZipPath, 'r') as zipObj:
 							logger('Unzipping into '+tempPath+'...')
 							zipObj.extractall(tempPath)
@@ -380,7 +406,7 @@ def mainloop(args):
 					logger('Executing: '+job['procedure']+'...')
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_EXECUTING, 'return-code': None, 'download-progress': 100, 'message': ''
-					})
+					}, False)
 					os.chdir(tempPath)
 
 					# restore library search path for subprocess (modified by PyInstaller)
@@ -409,7 +435,7 @@ def mainloop(args):
 					jobOutputReportThread.endEvent.set()
 					jobStatusRequest = jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_FINISHED, 'return-code': proc.wait(), 'message': guessEncodingAndDecode(outBuffer)
-					})
+					}, False)
 
 					# check server's update_job_state response
 					# cancel pending jobs if sequence mode is 1 (= 'abort after failed') and job failed
@@ -465,7 +491,7 @@ def mainloop(args):
 					logger(e)
 					jsonRequest('oco.agent.update_job_state', {
 						'job-id': job['id'], 'state': JOB_STATE_ERROR, 'return-code': -9999, 'message': str(e)
-					})
+					}, False)
 					os.chdir(tempfile.gettempdir())
 
 		# send events from logs if requested
@@ -480,7 +506,7 @@ def mainloop(args):
 				except Exception as e:
 					logger('Error reading events:', e)
 			if(len(events) > 0):
-				jsonRequest('oco.agent.events', {'events':events})
+				jsonRequest('oco.agent.events', {'events':events}, False)
 
 		# update admin password if requested
 		if('update-passwords' in responseJson['result']['params']):
@@ -491,7 +517,7 @@ def mainloop(args):
 					newPassword = pwr.generatePassword(item['alphabet'], item['length'])
 					newPasswords.append({'username':item['username'], 'password':newPassword, 'old_password':item['old_password'] if 'old_password' in item else ''})
 				# store the new passwords on the server
-				jsonRequest('oco.agent.passwords', {'passwords':newPasswords}, True)
+				jsonRequest('oco.agent.passwords', {'passwords':newPasswords})
 				# change them locally - only if jsonRequest succeeded to be sure that new passwords do not get lost
 				for item in newPasswords:
 					try:
@@ -500,7 +526,7 @@ def mainloop(args):
 						# in case of failure, e.g. user does not exist, we need revoke the password on the server
 						logger('Unable to rotate password for "'+str(item['username'])+'":', e2, '(trying to revoke)')
 						try:
-							jsonRequest('oco.agent.passwords', {'passwords':[{'username':item['username'], 'password':item['password'], 'revoke':True}]}, True)
+							jsonRequest('oco.agent.passwords', {'passwords':[{'username':item['username'], 'password':item['password'], 'revoke':True}]})
 						except Exception as e3:
 							logger('Unable to revoke password for "'+str(item['username'])+'":', e3)
 			except Exception as e:
@@ -558,7 +584,7 @@ def main():
 				logger('DNS auto discovery failed:', e)
 
 	except Exception as e:
-		logger(e)
+		logger('main():', type(e).__name__+':', e)
 		sys.exit(1)
 
 	# check if already running
@@ -575,8 +601,8 @@ def main():
 	# execute the agent once
 	else:
 		try: mainloop(args)
-		except KeyError as e:
-			logger('KeyError:', e)
+		except Exception as e:
+			logger(type(e).__name__+':', e)
 			sys.exit(1)
 
 if __name__ == '__main__':
