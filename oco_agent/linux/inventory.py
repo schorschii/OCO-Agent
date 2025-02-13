@@ -9,6 +9,7 @@ import utmp
 import datetime
 import platform
 import usb
+from shutil import which
 
 from . import systemd, cups
 from .. import base_inventory, logger
@@ -43,17 +44,20 @@ class Inventory(base_inventory.BaseInventory):
 
 	def getInstalledSoftware(self):
 		software = []
-		command = 'apt list --installed'
-		for l in os.popen(command).read().split('\n'):
-			packageName = l.split('/')[0]
-			if(len(l.split(' ')) > 1):
-				packageVersion = l.split(' ')[1];
-				if(packageName != '' and packageVersion != ''):
-					software.append({
-						'name': packageName,
-						'version': packageVersion,
-						'description': ''
-					})
+		if(which('apt')):
+			command = 'apt list --installed'
+			for l in os.popen(command).read().split('\n'):
+				packageName = l.split('/')[0]
+				if(len(l.split(' ')) > 1):
+					packageVersion = l.split(' ')[1];
+					if(packageName != '' and packageVersion != ''):
+						software.append({
+							'name': packageName,
+							'version': packageVersion,
+							'description': ''
+						})
+		else:
+			logger('No supported package manager found - unable to query installed software')
 		return software
 
 	def getLogins(self, dateObjectSince):
