@@ -30,6 +30,7 @@ import datetime
 import tempfile
 import subprocess
 import hmac, hashlib
+from shutil import which
 from zipfile import ZipFile
 from dns import resolver, rdatatype
 
@@ -202,6 +203,16 @@ def isUserLoggedIn():
 	elif 'darwin' in OS_TYPE:
 		return True # not implemented
 	return False
+
+def broadcastMessage(title, text):
+	if 'linux' in OS_TYPE:
+		if(which('notify-send')): # inform GUI users
+			script = 'oco_agent/linux/notify-send-all.sh'
+			if getattr(sys, 'frozen', False):
+				script = os.path.join(sys._MEIPASS, 'oco_agent/linux/notify-send-all.sh')
+			subprocess.check_output([script, title, text])
+		if(which('wall')): # inform CLI users
+			subprocess.check_output(['wall', text])
 
 def removeAll(path):
 	for root, dirs, files in os.walk(path, topdown=False):
@@ -462,10 +473,14 @@ def mainloop(args):
 						if(isUserLoggedIn()): timeout = int(job['restart'])
 						if 'win32' in OS_TYPE:
 							res = subprocess.run('shutdown -r -t '+str(timeout*60), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-							if(res.returncode == 0): restartFlag = True
+							if(res.returncode == 0):
+								restartFlag = True
+								# Windows auomatically displays a warning when scheduling shutdown/restart
 						else:
 							res = subprocess.run('shutdown -r +'+str(timeout), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-							if(res.returncode == 0): restartFlag = True
+							if(res.returncode == 0):
+								restartFlag = True
+								broadcastMessage('System restart scheduled', 'Your computer is about to restart at '+str(datetime.datetime.now()+datetime.timedelta(seconds=timeout))+' because of a software update installed by your administrator.')
 
 					# execute shutdown if requested
 					if('shutdown' in job and job['shutdown'] != None and isinstance(job['shutdown'], int) and job['shutdown'] >= 0):
@@ -473,10 +488,14 @@ def mainloop(args):
 						if(isUserLoggedIn()): timeout = int(job['shutdown'])
 						if 'win32' in OS_TYPE:
 							res = subprocess.run('shutdown -s -t '+str(timeout*60), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-							if(res.returncode == 0): restartFlag = True
+							if(res.returncode == 0):
+								restartFlag = True
+								# Windows auomatically displays a warning when scheduling shutdown/restart
 						else:
 							res = subprocess.run('shutdown -h +'+str(timeout), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
-							if(res.returncode == 0): restartFlag = True
+							if(res.returncode == 0):
+								restartFlag = True
+								broadcastMessage('System shutdown scheduled', 'Your computer is about to shut down at '+str(datetime.datetime.now()+datetime.timedelta(seconds=timeout))+' initiated by your administrator.')
 
 					# execute agent exit if requested (for agent update)
 					if('exit' in job and job['exit'] != None and isinstance(job['exit'], int) and job['exit'] >= 0):

@@ -38,7 +38,9 @@ def Entrypoint(dist, group, name, **kwargs):
 
 
 a = Entrypoint('oco_agent', 'console_scripts', 'oco-agent',
-    datas=[],
+    datas=[
+        ('oco_agent/linux/notify-send-all.sh', 'oco_agent/linux/')
+    ],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
