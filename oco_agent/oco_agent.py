@@ -30,10 +30,12 @@ import datetime
 import tempfile
 import subprocess
 import hmac, hashlib
+import base64
 from shutil import which
 from zipfile import ZipFile
 from dns import resolver, rdatatype
-
+from Crypto.Cipher import AES
+from Crypto import Random
 
 ##### CONSTANTS #####
 
@@ -236,6 +238,16 @@ def jobOutputReporter(jobId):
 				})
 		lastOutput = currentOutput
 		currentThread.endEvent.wait(delay)
+
+def encrypt(data, key):
+	# pad key to 32 bytes (AES-256)
+	key = (key[:32] + ("\x00"*(32-len(key)))).encode('utf-8')
+	pad = lambda s : s+chr(16-len(s)%16)*(16-len(s)%16)
+	iv = Random.get_random_bytes(16)
+	cipher = AES.new(key, AES.MODE_CBC, iv)
+	encrypted_64 = base64.b64encode(cipher.encrypt(pad(data).encode())).decode('ascii')
+	iv_64 = base64.b64encode(iv).decode('ascii')
+	return {'iv':iv_64, 'data':encrypted_64}
 
 # function for checking if agent is already running (e.g. due to long running software jobs)
 def lockCheck():
@@ -531,12 +543,21 @@ def mainloop(args):
 		if('update-passwords' in responseJson['result']['params']):
 			pwr = password_rotation.PasswordRotation()
 			newPasswords = []
+			newPasswordsRequest = []
 			try:
 				for item in responseJson['result']['params']['update-passwords']:
 					newPassword = pwr.generatePassword(item['alphabet'], item['length'])
-					newPasswords.append({'username':item['username'], 'password':newPassword, 'old_password':item['old_password'] if 'old_password' in item else ''})
+					newPasswords.append({
+						'username': item['username'],
+						'password': newPassword,
+						'old_password': item['old_password'] if 'old_password' in item else ''
+					})
+					newPasswordsRequest.append({
+						'username': item['username'],
+						'password': encrypt(newPassword, config['agent-key'])
+					})
 				# store the new passwords on the server
-				jsonRequest('oco.agent.passwords', {'passwords':newPasswords})
+				jsonRequest('oco.agent.passwords', {'passwords':newPasswordsRequest})
 				# change them locally - only if jsonRequest succeeded to be sure that new passwords do not get lost
 				for item in newPasswords:
 					try:
@@ -545,7 +566,11 @@ def mainloop(args):
 						# in case of failure, e.g. user does not exist, we need revoke the password on the server
 						logger('Unable to rotate password for "'+str(item['username'])+'":', e2, '(trying to revoke)')
 						try:
-							jsonRequest('oco.agent.passwords', {'passwords':[{'username':item['username'], 'password':item['password'], 'revoke':True}]})
+							jsonRequest('oco.agent.passwords', {
+								'passwords': [
+									{'username':item['username'], 'password':encrypt(item['password'], config['agent-key']), 'revoke':True}
+								]
+							})
 						except Exception as e3:
 							logger('Unable to revoke password for "'+str(item['username'])+'":', e3)
 			except Exception as e:
