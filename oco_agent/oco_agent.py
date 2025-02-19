@@ -31,6 +31,7 @@ import tempfile
 import subprocess
 import hmac, hashlib
 import base64
+import traceback
 from shutil import which
 from zipfile import ZipFile
 from dns import resolver, rdatatype
@@ -70,6 +71,7 @@ elif 'darwin' in OS_TYPE:
 
 exitEvent = threading.Event()
 restartFlag = False
+configFilePath = None
 configParser = configparser.RawConfigParser()
 config = {
 	# Agent config
@@ -92,6 +94,7 @@ config = {
 	# Server config
 	'api-url': '',
 	'server-key': '',
+	'server-timestamp': None,
 }
 
 
@@ -173,6 +176,15 @@ def jsonRequest(method, data, throw=True):
 		if(response.status_code != 200):
 			raise Exception('Request failed with HTTP status code ' + str(response.status_code))
 
+		# check timestamp greater than last
+		response_json = response.json()
+		if(not response_json or 'result' not in response_json or 'timestamp' not in response_json['result']):
+			raise Exception('No timestamp in server response')
+		if(config['server-timestamp'] and float(response_json['result']['timestamp']) <= float(config['server-timestamp'])):
+			raise Exception('Server timestamp is the same or lower than last server timestamp - this might be an attack, aborting')
+		writeConfig('server', 'timestamp', float(response_json['result']['timestamp']))
+		config['server-timestamp'] = configParser.get('server', 'timestamp')
+
 		# check server signature if set in agent config
 		if(config['server-key']):
 			if('x-oco-server-signature' not in response.headers):
@@ -249,6 +261,14 @@ def encrypt(data, key):
 	iv_64 = base64.b64encode(iv).decode('ascii')
 	return {'iv':iv_64, 'data':encrypted_64}
 
+def writeConfig(section, key, value):
+	global configParser, configFilePath
+	if(not configParser.has_section(section)):
+		configParser.add_section(section)
+	configParser.set(section, key, value)
+	with open(configFilePath, 'w') as fileHandle:
+		configParser.write(fileHandle)
+
 # function for checking if agent is already running (e.g. due to long running software jobs)
 def lockCheck():
 	try:
@@ -299,6 +319,7 @@ def daemon(args):
 			mainloop(args)
 		except Exception as e:
 			logger(type(e).__name__+':', e)
+			traceback.print_exc()
 		logger('Running in daemon mode. Waiting '+str(config['query-interval'])+' seconds to send next request.')
 		exitEvent.wait(config['query-interval'])
 
@@ -327,18 +348,14 @@ def mainloop(args):
 		if('server-key' in responseJson['result']['params']
 		and (config['server-key'] == None or config['server-key'] == '')):
 			logger('Write new config with updated server key...')
-			if(not configParser.has_section('server')): configParser.add_section('server')
-			configParser.set('server', 'server-key', responseJson['result']['params']['server-key'])
-			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
+			writeConfig('agent', 'server-key', responseJson['result']['params']['server-key'])
 			config['server-key'] = configParser.get('server', 'server-key')
 
 		# update agent key if requested
 		if('agent-key' in responseJson['result']['params']
 		and responseJson['result']['params']['agent-key'] != None):
 			logger('Write new config with updated agent key...')
-			if(not configParser.has_section('agent')): configParser.add_section('agent')
-			configParser.set('agent', 'agent-key', responseJson['result']['params']['agent-key'])
-			with open(args.config, 'w') as fileHandle: configParser.write(fileHandle)
+			writeConfig('agent', 'agent-key', responseJson['result']['params']['agent-key'])
 			config['agent-key'] = configParser.get('agent', 'agent-key')
 
 		# send computer info if requested
@@ -583,6 +600,8 @@ def signal_handler(signum, frame):
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 def main():
+	global configFilePath, configParser, config
+
 	try:
 		# read arguments
 		parser = argparse.ArgumentParser(add_help=False)
@@ -609,6 +628,7 @@ def main():
 		if(configParser.has_section('server')):
 			config['api-url'] = configParser['server'].get('api-url', config['api-url'])
 			config['server-key'] = configParser['server'].get('server-key', config['server-key'])
+			config['server-timestamp'] = configParser['server'].get('timestamp', config['server-timestamp'])
 		if(configParser.has_section('windows')):
 			config['windows']['username-with-domain'] = (int(configParser['windows'].get('username-with-domain', config['windows']['username-with-domain'])) == 1)
 
@@ -647,6 +667,7 @@ def main():
 		try: mainloop(args)
 		except Exception as e:
 			logger(type(e).__name__+':', e)
+			traceback.print_exc()
 			sys.exit(1)
 
 if __name__ == '__main__':
