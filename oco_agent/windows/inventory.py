@@ -357,3 +357,18 @@ class Inventory(base_inventory.BaseInventory):
 			except Exception as e:
 				logger('Error reading USB device:', e)
 		return devices
+
+	def getLocalUsers(self):
+		users = []
+		w = wmi.WMI()
+		for o in w.query('SELECT * FROM Win32_UserAccount WHERE LocalAccount = TRUE'):
+			try:
+				users.append({
+					'username': o.Caption.split('\\')[1], 'display_name': o.FullName,
+					'uid': o.SID, 'gid': None,
+					'home': '', 'shell': '',
+					'disabled': o.Disabled
+				})
+			except Exception as e:
+				logger('Error reading local user:', e)
+		return users

@@ -8,7 +8,7 @@ import plistlib
 import usb
 
 from . import utmpx
-from ..linux import cups
+from ..linux import cups, local_users
 from .. import base_inventory, logger
 
 
@@ -170,3 +170,9 @@ class Inventory(base_inventory.BaseInventory):
 			except Exception as e:
 				logger('Error reading USB device:', e)
 		return devices
+
+	def getLocalUsers(self):
+		return local_users.getLocalUsers(
+			self.config['macos']['local-users-min-uid'],
+			self.config['macos']['local-users-max-uid']
+		)

@@ -86,8 +86,14 @@ config = {
 	'hostname-remove-domain': True,
 	'machine-uid': '',
 	# Platform specific agent config
-	'linux': {},
-	'macos': {},
+	'linux': {
+		'local-users-min-uid': 1000,
+		'local-users-max-uid': 65534
+	},
+	'macos': {
+		'local-users-min-uid': 1000,
+		'local-users-max-uid': 65534
+	},
 	'windows': {
 		'username-with-domain': False
 	},
@@ -392,6 +398,7 @@ def mainloop(args):
 				'partitions': i.getPartitions(),
 				'software': i.getInstalledSoftware(),
 				'logins': logins,
+				'users': i.getLocalUsers(),
 				'battery_level': i.getBatteryLevel(),
 				'battery_status': i.getBatteryStatus(),
 				'devices': i.getUsbDevices(),
@@ -631,6 +638,8 @@ def main():
 			config['server-timestamp'] = configParser['server'].get('timestamp', config['server-timestamp'])
 		if(configParser.has_section('windows')):
 			config['windows']['username-with-domain'] = (int(configParser['windows'].get('username-with-domain', config['windows']['username-with-domain'])) == 1)
+		if(configParser.has_section('linux')):
+			config['linux']['local-users-min-uid'] = int(configParser['windows'].get('local-users-min-uid', config['linux']['local-users-min-uid']))
 
 		# try server auto discovery
 		if(config['api-url'].strip() == ''):

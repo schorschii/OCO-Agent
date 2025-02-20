@@ -11,7 +11,7 @@ import platform
 import usb
 from shutil import which
 
-from . import systemd, cups
+from . import systemd, cups, local_users
 from .. import base_inventory, logger
 
 
@@ -210,3 +210,9 @@ class Inventory(base_inventory.BaseInventory):
 			except Exception as e:
 				logger('Error reading USB device:', e)
 		return devices
+
+	def getLocalUsers(self):
+		return local_users.getLocalUsers(
+			self.config['linux']['local-users-min-uid'],
+			self.config['linux']['local-users-max-uid']
+		)
