@@ -322,11 +322,18 @@ class Inventory(base_inventory.BaseInventory):
 	def getPartitions(self):
 		partitions = []
 		w = wmi.WMI()
+		w2 = wmi.WMI(namespace='CIMV2\\Security\\MicrosoftVolumeEncryption')
 		for ld in w.Win32_LogicalDisk():
 			devicePath = '?'
+			label = ''
+			isEncrypted = False
 			for v in w.Win32_Volume():
 				if(v.DriveLetter == ld.DeviceID):
 					devicePath = v.DeviceID
+					label = v.Label
+			for ev in w2.query('SELECT * FROM Win32_EncryptableVolume'):
+				if(ev.DeviceID == devicePath):
+					isEncrypted = ev.ProtectionStatus == 1
 			partitions.append({
 				'device': devicePath,
 				'mountpoint': ld.DeviceID,
@@ -334,7 +341,9 @@ class Inventory(base_inventory.BaseInventory):
 				'name': ld.VolumeName,
 				'size': ld.Size,
 				'free': ld.FreeSpace,
-				'serial': ld.VolumeSerialNumber
+				'name': label,
+				'uuid': ld.VolumeSerialNumber,
+				'encrypted': isEncrypted
 			})
 		return partitions
 

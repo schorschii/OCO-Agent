@@ -137,6 +137,20 @@ class Inventory(base_inventory.BaseInventory):
 
 	def getPartitions(self):
 		partitions = []
+
+		diskutilInfo = {}
+		tmpInfo = {}
+		command = 'diskutil info -all'
+		lines = os.popen(command).read().strip().splitlines()
+		for line in lines:
+			if(line.strip() == '**********'):
+				if('Device Node' in tmpInfo):
+					diskutilInfo[tmpInfo['Device Node']] = tmpInfo
+				tmpInfo = {}
+			splitter = line.split(':')
+			if(len(splitter) > 1):
+				tmpInfo[splitter[0].strip()] = splitter[1].strip()
+
 		command = 'df -k'
 		lines = os.popen(command).read().strip().splitlines()
 		first = True
@@ -145,14 +159,29 @@ class Inventory(base_inventory.BaseInventory):
 			values = ' '.join(line.split()).split()
 			if(len(values) != 9): continue
 			if(values[0] == 'devfs'): continue
+
+			isEncrypted = False; label = ''; uuid = ''; fs = ''
+			if(values[0] in diskutilInfo):
+				if('FileVault' in diskutilInfo[values[0]]):
+					isEncrypted = diskutilInfo[values[0]]['FileVault'] == 'Yes'
+				if('Volume Name' in diskutilInfo[values[0]]):
+					label = diskutilInfo[values[0]]['Volume Name']
+				if('Volume UUID' in diskutilInfo[values[0]]):
+					uuid = diskutilInfo[values[0]]['Volume UUID']
+				if('File System Personality' in diskutilInfo[values[0]]):
+					fs = diskutilInfo[values[0]]['File System Personality']
+				elif('Partition Type:' in diskutilInfo[values[0]]):
+					fs = diskutilInfo[values[0]]['Partition Type:']
+
 			partitions.append({
 				'device': values[0],
 				'mountpoint': values[8],
-				'filesystem': '',
+				'filesystem': fs,
 				'size': (int(values[2])+int(values[3]))*1024,
 				'free': int(values[3])*1024,
-				'name': '',
-				'serial': ''
+				'name': label,
+				'uuid': uuid,
+				'encrypted': isEncrypted
 			})
 		return partitions
 

@@ -9,6 +9,7 @@ import utmp
 import datetime
 import platform
 import usb
+import json
 from shutil import which
 
 from . import systemd, cups, local_users
@@ -175,25 +176,61 @@ class Inventory(base_inventory.BaseInventory):
 	def getPrinters(self):
 		return cups.getPrinters()
 
+	def _isInEncryptedBlkidChildren(self, mountpoint, children, contextEncrypted=False):
+		for dct in children:
+			if('mountpoints' not in dct or 'type' not in dct):
+				return False
+			if(mountpoint in dct['mountpoints']):
+				return contextEncrypted or dct['type']=='crypt'
+			elif('children' in dct):
+				if(self._isInEncryptedBlkidChildren(mountpoint, dct['children'], dct['type']=='crypt')):
+					return True
+		return False
+
 	def getPartitions(self):
 		partitions = []
+		devices = []
+
+		# 1. get basic info (size, free space, fs type)
 		command = 'df -k --output=used,avail,fstype,source,target'
 		lines = os.popen(command).read().strip().splitlines()
+
+		# 2. check if it is encrypted (= inside LUKS container)
+		command = 'lsblk --json'
+		tree = json.loads( os.popen(command).read().strip() )
+
 		first = True
 		for line in lines:
 			if(first): first = False; continue
 			values = ' '.join(line.split()).split()
 			if(len(values) != 5): continue
 			if(values[2] == 'tmpfs' or values[2] == 'devtmpfs'): continue
+
+			if('blockdevices' in tree):
+				isEncrypted = self._isInEncryptedBlkidChildren(values[4], tree['blockdevices'])
+
+			# 3. get UUID + label
+			command = 'blkid -s LABEL '+shlex.quote(values[3])
+			line = os.popen(command).read().strip()
+			index = line.rfind('=')
+			label = line[index + 2:-1]
+			command = 'blkid -s UUID '+shlex.quote(values[3])
+			line = os.popen(command).read().strip()
+			index = line.rfind('=')
+			uuid = line[index + 2:-1]
+
+			devices.append(values[3])
 			partitions.append({
 				'device': values[3],
 				'mountpoint': values[4],
 				'filesystem': values[2],
 				'size': (int(values[0])+int(values[1]))*1024,
 				'free': int(values[1])*1024,
-				'name': '',
-				'serial': ''
+				'name': label,
+				'uuid': uuid,
+				'encrypted': isEncrypted
 			})
+
 		return partitions
 
 	def getUsbDevices(self):
