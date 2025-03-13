@@ -354,7 +354,7 @@ def mainloop(args):
 		if('server-key' in responseJson['result']['params']
 		and (config['server-key'] == None or config['server-key'] == '')):
 			logger('Write new config with updated server key...')
-			writeConfig('agent', 'server-key', responseJson['result']['params']['server-key'])
+			writeConfig('server', 'server-key', responseJson['result']['params']['server-key'])
 			config['server-key'] = configParser.get('server', 'server-key')
 
 		# update agent key if requested
