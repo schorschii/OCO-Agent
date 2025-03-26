@@ -180,7 +180,7 @@ def jsonRequest(method, data, throw=True):
 		# check response
 		if(config['debug']): logger('> (' + str(response.elapsed.total_seconds()) + 's) [' + str(response.status_code) + '] ' + response.text)
 		if(response.status_code != 200):
-			raise Exception('Request failed with HTTP status code ' + str(response.status_code))
+			raise Exception('Request failed with HTTP status code ' + str(response.status_code) + ': ' + response.text)
 
 		# check timestamp greater than last
 		response_json = response.json()
