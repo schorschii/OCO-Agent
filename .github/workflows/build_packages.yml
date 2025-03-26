@@ -189,12 +189,16 @@ jobs:
 
       - name: Compile binaries
         run: venv/bin/pyinstaller oco-agent.macos.spec
+        env:
+          DEVELOPER_ID_APPLICATION_CERT_NAME: ${{ vars.DEVELOPER_ID_APPLICATION_CERT_NAME }}
+
+      #- name: Re-sign the Python3 binary to make notarytool happy
+      #  run: codesign --timestamp --force --sign "${{ vars.DEVELOPER_ID_APPLICATION_CERT_NAME }}" dist/oco-agent/Python3.framework/Versions/Current/Python3
 
       - name: Execute package build
         run: cd installer/macos/ && ./build.sh
         env:
-          DEVELOPER_ID_INSTALLER_CERT_BASE64: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_BASE64 }}
-          DEVELOPER_ID_INSTALLER_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_PASSWORD }}
+          DEVELOPER_ID_INSTALLER_CERT_NAME: ${{ vars.DEVELOPER_ID_INSTALLER_CERT_NAME }}
           DEVELOPER_ACCOUNT_USERNAME: ${{ secrets.DEVELOPER_ACCOUNT_USERNAME }}
           DEVELOPER_ACCOUNT_PASSWORD: ${{ secrets.DEVELOPER_ACCOUNT_PASSWORD }}
           DEVELOPER_ACCOUNT_TEAM: ${{ secrets.DEVELOPER_ACCOUNT_TEAM }}
