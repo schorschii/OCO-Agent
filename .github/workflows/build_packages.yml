@@ -115,6 +115,9 @@ jobs:
       - name: Compile binaries
         run: venv/bin/pyinstaller oco-agent.macos.spec
 
+      - name: Re-sign the Python3 binary to make notarytool happy
+        run: codesign --timestamp --force --sign 4B7092469383AAFE294DA4B2B0CCB1BB0050DF72 dist/oco-agent/Python3.framework/Versions/3.9/Python3
+
       - name: Execute package build
         run: cd installer/macos/ && ./build.sh
         env:

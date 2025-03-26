@@ -1,8 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
-block_cipher = None
-
 # get SHA-1 hash of you Developer ID Application certificate for signing (optional)
 # security find-identity -v -p codesigning
 codesign_identity = '4B7092469383AAFE294DA4B2B0CCB1BB0050DF72'
@@ -52,18 +50,16 @@ a = Entrypoint('oco_agent', 'console_scripts', 'oco-agent',
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
     a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='oco-agent',
     debug=False,
     bootloader_ignore_signals=False,
@@ -77,4 +73,14 @@ exe = EXE(
     target_arch=None,
     codesign_identity=codesign_identity,
     entitlements_file=None,
+    contents_directory='.',
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='oco-agent',
 )

@@ -36,9 +36,9 @@ sed -i '' -e "s/__FILENAME__/$TARGET_FILENAME/g" "${TARGET_DIRECTORY}/darwin/Dis
 
 # copy files in place
 mkdir -p "${TARGET_DIRECTORY}/darwinpkg"
-mkdir -p "${TARGET_DIRECTORY}/darwinpkg/opt/oco-agent"
+mkdir -p "${TARGET_DIRECTORY}/darwinpkg/opt"
 mkdir -p "${TARGET_DIRECTORY}/darwinpkg/Library/LaunchDaemons"
-cp "../../dist/oco-agent" "${TARGET_DIRECTORY}/darwinpkg/opt/oco-agent/oco-agent"
+cp -R "../../dist/oco-agent" "${TARGET_DIRECTORY}/darwinpkg/opt/oco-agent"
 cp "../../systems.sieber.oco-agent.plist" "${TARGET_DIRECTORY}/darwinpkg/Library/LaunchDaemons/systems.sieber.oco-agent.plist"
 chmod 755 "${TARGET_DIRECTORY}/darwinpkg/opt/oco-agent"
 chmod 744 "${TARGET_DIRECTORY}/darwinpkg/opt/oco-agent/oco-agent"
