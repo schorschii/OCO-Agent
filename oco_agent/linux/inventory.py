@@ -235,17 +235,20 @@ class Inventory(base_inventory.BaseInventory):
 
 	def getUsbDevices(self):
 		devices = []
-		for dev in usb.core.find(find_all=True):
-			try:
-				devices.append({
-					'subsystem': 'usb',
-					'vendor': dev.idVendor,
-					'product': dev.idProduct,
-					'serial': usb.util.get_string(dev, dev.iSerialNumber),
-					'name': usb.util.get_string(dev, dev.iProduct)
-				})
-			except Exception as e:
-				logger('Error reading USB device:', e)
+		try:
+			for dev in usb.core.find(find_all=True):
+				try:
+					devices.append({
+						'subsystem': 'usb',
+						'vendor': dev.idVendor,
+						'product': dev.idProduct,
+						'serial': usb.util.get_string(dev, dev.iSerialNumber),
+						'name': usb.util.get_string(dev, dev.iProduct)
+					})
+				except Exception as e:
+					logger('Error reading USB device:', e)
+		except Exception as e:
+			logger('Error reading USB devices:', e)
 		return devices
 
 	def getLocalUsers(self):
