@@ -117,8 +117,8 @@ jobs:
         env:
           DEVELOPER_ID_APPLICATION_CERT_NAME: ${{ vars.DEVELOPER_ID_APPLICATION_CERT_NAME }}
 
-      - name: Re-sign the Python3 binary to make notarytool happy
-        run: codesign --timestamp --force --sign "${{ vars.DEVELOPER_ID_APPLICATION_CERT_NAME }}" dist/oco-agent/Python3.framework/Versions/3.9/Python3
+      #- name: Re-sign the Python3 binary to make notarytool happy
+      #  run: codesign --timestamp --force --sign "${{ vars.DEVELOPER_ID_APPLICATION_CERT_NAME }}" dist/oco-agent/Python3.framework/Versions/Current/Python3
 
       - name: Execute package build
         run: cd installer/macos/ && ./build.sh
