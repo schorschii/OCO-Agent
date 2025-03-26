@@ -1,9 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-
-
-# get SHA-1 hash of you Developer ID Application certificate for signing (optional)
-# security find-identity -v -p codesigning
-codesign_identity = '4B7092469383AAFE294DA4B2B0CCB1BB0050DF72'
+import os
 
 
 def Entrypoint(dist, group, name, **kwargs):
@@ -71,7 +67,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
-    codesign_identity=codesign_identity,
+    codesign_identity=os.environ.get('DEVELOPER_ID_APPLICATION_CERT_NAME', None),
     entitlements_file=None,
     contents_directory='.',
 )
