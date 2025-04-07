@@ -334,7 +334,11 @@ class Inventory(base_inventory.BaseInventory):
 	def getPartitions(self):
 		partitions = []
 		w = wmi.WMI()
-		w2 = wmi.WMI(namespace='CIMV2\\Security\\MicrosoftVolumeEncryption')
+		w2 = None
+		try:
+			w2 = wmi.WMI(namespace='CIMV2\\Security\\MicrosoftVolumeEncryption')
+		except Exception as e:
+			logger('Unable to get Bitlocker info:', e)
 		for ld in w.Win32_LogicalDisk():
 			devicePath = '?'
 			label = ''
@@ -343,9 +347,10 @@ class Inventory(base_inventory.BaseInventory):
 				if(v.DriveLetter == ld.DeviceID):
 					devicePath = v.DeviceID
 					label = v.Label
-			for ev in w2.query('SELECT * FROM Win32_EncryptableVolume'):
-				if(ev.DeviceID == devicePath):
-					isEncrypted = ev.ProtectionStatus == 1
+			if w2:
+				for ev in w2.query('SELECT * FROM Win32_EncryptableVolume'):
+					if(ev.DeviceID == devicePath):
+						isEncrypted = ev.ProtectionStatus == 1
 			partitions.append({
 				'device': devicePath,
 				'mountpoint': ld.DeviceID,
