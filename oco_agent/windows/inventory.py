@@ -72,7 +72,7 @@ class Inventory(base_inventory.BaseInventory):
 		w = wmi.WMI()
 		for o in w.Win32_QuickFixEngineering():
 			software.append({
-				'name': '[Update] ' + o.Description + ' ' + o.CSName,
+				'name': '[Update] ' + o.Description,
 				'version': o.HotFixID,
 				'description': o.Caption
 			})
