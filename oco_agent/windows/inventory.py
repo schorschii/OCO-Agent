@@ -58,20 +58,32 @@ class Inventory(base_inventory.BaseInventory):
 				try: systemComponent, regtype = winreg.QueryValueEx(reg, 'SystemComponent')
 				except WindowsError: pass
 				winreg.CloseKey(reg)
-				if(displayName.strip() == '' or systemComponent == 1): continue
+				if(displayName.strip() == ''): continue
 				software.append({
-					'name': displayName,
+					'name': ('[System] ' if systemComponent==1 else '') + displayName,
 					'version': displayVersion,
 					'description': displayPublisher
 				})
 			except WindowsError: pass
 		return software
 
+	def __queryQuickFixes(self):
+		software = []
+		w = wmi.WMI()
+		for o in w.Win32_QuickFixEngineering():
+			software.append({
+				'name': '[Update] ' + o.Description + ' ' + o.CSName,
+				'version': o.HotFixID,
+				'description': o.Caption
+			})
+		return software
+
 	def getInstalledSoftware(self):
 		x64software = self.__queryRegistrySoftware('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall')
 		x32software = self.__queryRegistrySoftware('SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')
 		appXpackages = self.__queryAppxPackages()
-		return x32software + x64software + appXpackages
+		quickFixes = self.__queryQuickFixes()
+		return x32software + x64software + appXpackages + quickFixes
 
 	def __queryRegistryUserDisplayName(self, querySid):
 		# get user fullname from SessionData cache in registry
