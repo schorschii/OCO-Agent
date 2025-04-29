@@ -8,3 +8,6 @@ Template: oco-agent/agent-key
 Type: string
 Description: Please enter the agent key which should be used to authenticate against your OCO server.
 
+Template: oco-agent/server-key
+Type: string
+Description: Please enter the server key which should be used to validate your OCO server (optional).

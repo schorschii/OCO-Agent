@@ -21,6 +21,11 @@ db_go || true
 db_get oco-agent/agent-key
 sed -i "s|AGENTKEY|$RET|g" /etc/oco-agent.ini
 
+db_input high oco-agent/server-key || true
+db_go || true
+db_get oco-agent/server-key
+sed -i "s|SERVERKEY|$RET|g" /etc/oco-agent.ini
+
 # register and start service
 systemctl daemon-reload || true
 systemctl enable oco-agent || true

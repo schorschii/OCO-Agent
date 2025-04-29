@@ -170,6 +170,7 @@ var
   InfFile: string;
   DefaultServerName: string;
   DefaultAgentKey: string;
+  DefaultServerKey: string;
 begin
   { do not register the service again if this is an update }
   InstallService := not FileExists('{#MyAppDir}\oco-agent.exe');
@@ -185,19 +186,23 @@ begin
     );
     CustomQueryPage.Add('DNS name (FQDN) of your OCO server: ', False);
     CustomQueryPage.Add('Agent key to authenticate against your OCO server: ', False);
+    CustomQueryPage.Add('Server key to validate your OCO server (optional): ', False);
 
     { load defaults from .ini if given }
     DefaultServerName := ''
     DefaultAgentKey   := ''
+    DefaultServerKey  := ''
     InfFile := ExpandConstant('{param:LOADINF}');
     if InfFile <> '' then
     begin
       DefaultServerName := GetIniString('Setup', 'ServerName', DefaultServerName, InfFile)
       DefaultAgentKey   := GetIniString('Setup', 'AgentKey', DefaultAgentKey, InfFile)
+      DefaultServerKey  := GetIniString('Setup', 'ServerKey', DefaultServerKey, InfFile)
       DoNotStartService := GetIniBool('Setup', 'DoNotStartService', false, InfFile)
     end;
     CustomQueryPage.Values[0] := DefaultServerName
     CustomQueryPage.Values[1] := DefaultAgentKey
+    CustomQueryPage.Values[2] := DefaultServerKey
   end;
 end;
 
@@ -256,6 +261,7 @@ begin
       end;
       FileReplaceString(ExpandConstant('{#AgentConfigFilePath}'), 'SERVERURL', ServerName);
       FileReplaceString(ExpandConstant('{#AgentConfigFilePath}'), 'AGENTKEY', CustomQueryPage.Values[1]);
+      FileReplaceString(ExpandConstant('{#AgentConfigFilePath}'), 'SERVERKEY', CustomQueryPage.Values[2]);
     end;
 
     if RestartService then
