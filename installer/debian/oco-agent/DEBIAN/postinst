@@ -7,7 +7,7 @@ set -e
 . /usr/share/debconf/confmodule
 
 # ask and set settings
-# (use "echo PURGE | sudo debconf-communicate companion-linux" to reset)
+# (use "echo PURGE | sudo debconf-communicate oco-agent" to reset from /var/cache/debconf/config.dat)
 db_input high oco-agent/server-name || true
 db_go || true
 db_get oco-agent/server-name
