@@ -61,6 +61,7 @@ For a fully automated installation, it is necessary to hand over the OCO server 
   [Setup]
   ServerName=oco.example.com
   AgentKey=1235678
+  ServerKey=1235678
   ```
   Then, call the setup with the parameter `/LOADINF=.\oco-agent-setup.inf /SILENT`. Delete the `oco-agent-setup.inf` file after the agent installation to protect the agent key.
 
