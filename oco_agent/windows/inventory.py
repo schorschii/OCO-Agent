@@ -294,13 +294,20 @@ class Inventory(base_inventory.BaseInventory):
 		return booted
 
 	def getCpu(self):
-		return platform.processor()
+		w = wmi.WMI()
+		cpus = []
+		for o in w.Win32_Processor():
+			cpus.append(o.Name)
+		if(not cpus): return '?'
+		else: return ', '.join(cpus)
 
 	def getGpu(self):
 		w = wmi.WMI()
+		gpus = []
 		for o in w.Win32_VideoController():
-			return o.Name
-		return '?'
+			gpus.append(o.Name)
+		if(not gpus): return '?'
+		else: return ', '.join(gpus)
 
 	def __printerStatus(self, status, state):
 		if(state == 2): return 'Error'
