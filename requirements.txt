@@ -11,6 +11,7 @@ pycryptodome==3.21.0
 # Linux specific
 utmp; sys_platform == "linux"
 pyusb; sys_platform == "linux"
+# Ubuntu/Debian packages: python3-systemd python3-ldb
 
 # macOS specific
 pyusb; sys_platform == "darwin"

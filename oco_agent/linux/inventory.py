@@ -61,6 +61,20 @@ class Inventory(base_inventory.BaseInventory):
 			logger('No supported package manager found - unable to query installed software')
 		return software
 
+	def __querySssdUserGuid(self, uid):
+		try:
+			# this module is only available when the Debian/Ubuntu package python3-ldb is installed
+			# it's OK if the import fails, then this feature is not available
+			import ldb
+			for f in glob.glob('/var/lib/sss/db/cache_*.ldb'):
+				db = ldb.Ldb()
+				db.connect(f, FLG_RDONLY)
+				for result in db.search(expression=f'uidNumber={uid}'):
+					return result['uniqueID']
+		except Exception as e:
+			logger('Error getting GUID for user:', uid, e)
+		return None
+
 	def getLogins(self, dateObjectSince):
 		users = []
 		try:
@@ -71,6 +85,7 @@ class Inventory(base_inventory.BaseInventory):
 						dateObject = datetime.datetime.utcfromtimestamp(entry.sec).replace(tzinfo=datetime.timezone.utc) # utmp values are in UTC
 						if(dateObject <= dateObjectSince): continue
 						users.append({
+							'guid': self.__querySssdUserGuid(entry.uid),
 							'display_name': os.popen('getent passwd '+shlex.quote(entry.user)+' | cut -d : -f 5').read().strip().rstrip(','),
 							'username': entry.user,
 							'console': entry.line,

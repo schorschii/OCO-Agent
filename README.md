@@ -89,7 +89,7 @@ Please do not forget to adjust the config file to point to your OCO server and s
 ### Linux (Systemd)
 ```
 # install available python modules globally to avoid duplicate install in venv
-apt install python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv python3-systemd mokutil
+apt install python3-dnspython python3-requests python3-netifaces python3-psutil python3-distro python3-pip python3-dateutil python3-venv python3-systemd python3-ldb mokutil
 
 # using system site packages is important for the systemd journalctl module
 python3 -m venv venv --system-site-packages
