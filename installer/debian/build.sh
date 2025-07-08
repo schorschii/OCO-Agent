@@ -30,7 +30,7 @@ mkdir -p $BUILDDIR/lib/oco-agent/service-checks
 # copy files in place
 cp -r                  ../../dist/oco-agent        $BUILDDIR/$INSTALLDIR
 sudo install -D -m 660 ../../oco-agent.dist.ini    $BUILDDIR/etc/oco-agent.ini
-sudo install -D -m 644 ../../oco-agent.service  -t $BUILDDIR/lib/systemd/system/
+sudo install -D -m 644 ../../assets/oco-agent.service  -t $BUILDDIR/lib/systemd/system/
 
 # set file permissions
 chmod 774 $BUILDDIR/$INSTALLDIR/oco-agent

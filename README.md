@@ -99,10 +99,14 @@ venv/bin/pyinstaller oco-agent.linux.spec
 
 # copy `dist/oco-agent` to `/usr/share/oco-agent`
 # copy `oco-agent.example.ini` to `/etc/oco-agent.ini` and enter your server details
-# copy `oco-agent.service` to `/etc/systemd/system/oco-agent.service`
 
+# for systemd: copy `assets/oco-agent.service` to `/etc/systemd/system/oco-agent.service`
 systemctl enable oco-agent
 systemctl start oco-agent
+
+# for sysvinit: copy `assets/oco-agent.sysvinit` to `/etc/init.d/oco-agent`
+update-rc.d oco-agent defaults
+service oco-agent start
 ```
 
 ### macOS
