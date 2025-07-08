@@ -10,6 +10,7 @@ import datetime
 import platform
 import usb
 import json
+import glob
 from shutil import which
 
 from . import systemd, cups, local_users
@@ -77,6 +78,7 @@ class Inventory(base_inventory.BaseInventory):
 
 	def getLogins(self, dateObjectSince):
 		users = []
+		guidCache = {}
 		try:
 			with open('/var/log/wtmp', 'rb') as fd:
 				buf = fd.read()
@@ -84,8 +86,14 @@ class Inventory(base_inventory.BaseInventory):
 					if(str(entry.type) == 'UTmpRecordType.user_process'):
 						dateObject = datetime.datetime.utcfromtimestamp(entry.sec).replace(tzinfo=datetime.timezone.utc) # utmp values are in UTC
 						if(dateObject <= dateObjectSince): continue
+						if(entry.user in guidCache):
+							guid = guidCache[entry.user]
+						else:
+							uid = os.popen('id -u '+shlex.quote(entry.user)).read().strip()
+							guid = self.__querySssdUserGuid(uid)
+							guidCache[entry.user] = guid
 						users.append({
-							'guid': self.__querySssdUserGuid(entry.uid),
+							'guid': guid,
 							'display_name': os.popen('getent passwd '+shlex.quote(entry.user)+' | cut -d : -f 5').read().strip().rstrip(','),
 							'username': entry.user,
 							'console': entry.line,
