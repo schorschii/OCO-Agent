@@ -69,9 +69,9 @@ class Inventory(base_inventory.BaseInventory):
 			import ldb
 			for f in glob.glob('/var/lib/sss/db/cache_*.ldb'):
 				db = ldb.Ldb()
-				db.connect(f, FLG_RDONLY)
+				db.connect(f, ldb.FLG_RDONLY)
 				for result in db.search(expression=f'uidNumber={uid}'):
-					return result['uniqueID']
+					return str(result['uniqueID']).strip()
 		except Exception as e:
 			logger('Error getting GUID for user:', uid, e)
 		return None
