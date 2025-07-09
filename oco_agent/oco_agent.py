@@ -119,7 +119,7 @@ def downloadFile(url, packageId, path, jobId):
 		'params': {
 			'uid': config['machine-uid'],
 			'hostname': i.getHostname(),
-			'timestamp': time.time(),
+			'timestamp': round(time.time(), 4),
 			'package-id': packageId,
 		}
 	}
@@ -161,7 +161,7 @@ def jsonRequest(method, data, throw=True):
 		'params': {
 			'uid': config['machine-uid'],
 			'hostname': i.getHostname(),
-			'timestamp': time.time(),
+			'timestamp': round(time.time(), 4),
 			'data': data
 		}
 	}
