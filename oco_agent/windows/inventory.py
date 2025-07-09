@@ -278,7 +278,14 @@ class Inventory(base_inventory.BaseInventory):
 			if(match):
 				endIndex = match.span()[1]
 				releaseName = releaseName[endIndex:] + ' ' + releaseName[0:endIndex]
-			return f"Windows {releaseName} {platform.win32_edition()}"
+
+			releaseEdition = platform.win32_edition()
+			match = re.search('^(Server)(?=.+)', releaseEdition)
+			if(match):
+				endIndex = match.span()[1]
+				releaseEdition = releaseEdition[endIndex:]
+
+			return f"Windows {releaseName} {releaseEdition}"
 		except Error:
 			return platform.system()
 
