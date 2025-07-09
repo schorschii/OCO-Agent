@@ -5,6 +5,7 @@ import json
 import pyedid
 import time, datetime
 import platform
+import re
 
 import wmi, winreg
 from win32com.client import GetObject
@@ -269,7 +270,15 @@ class Inventory(base_inventory.BaseInventory):
 
 	def getOs(self):
 		try:
-			return f"Windows {platform.win32_ver()[0]} {platform.win32_edition()}"
+			# the platform module has strange descriptions for Windows Server releases,
+			# so we beautify them here a bit
+			# https://github.com/python/cpython/blob/77fa7a4dcc771bf4d297ebfd4f357483d0750a1c/Lib/platform.py#L362
+			releaseName = platform.win32_ver()[0]
+			match = re.search('([A-Za-z]*[0-9]{4})(?=[A-Za-z]+)', releaseName)
+			if(match):
+				endIndex = match.span()[1]
+				releaseName = releaseName[endIndex:] + ' ' + releaseName[0:endIndex]
+			return f"Windows {releaseName} {platform.win32_edition()}"
 		except Error:
 			return platform.system()
 
