@@ -315,7 +315,7 @@ class Inventory(base_inventory.BaseInventory):
 		for o in w.Win32_Processor():
 			cpus.append(o.Name)
 		if(not cpus): return '?'
-		else: return ', '.join(cpus)
+		else: return "\n".join(cpus)
 
 	def getGpu(self):
 		w = wmi.WMI()
@@ -323,7 +323,7 @@ class Inventory(base_inventory.BaseInventory):
 		for o in w.Win32_VideoController():
 			gpus.append(o.Name)
 		if(not gpus): return '?'
-		else: return ', '.join(gpus)
+		else: return "\n".join(gpus)
 
 	def __printerStatus(self, status, state):
 		if(state == 2): return 'Error'

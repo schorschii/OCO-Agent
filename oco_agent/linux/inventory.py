@@ -194,7 +194,7 @@ class Inventory(base_inventory.BaseInventory):
 					cardName = card.split(prefix)[1].split('(rev')[0].strip()
 					cards.append(cardName)
 		os.environ['PATH'] = envpath
-		return ', '.join(cards)
+		return "\n".join(cards)
 
 	def getPrinters(self):
 		return cups.getPrinters()
