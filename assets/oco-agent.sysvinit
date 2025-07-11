@@ -15,6 +15,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/bin/oco-agent
 NAME=oco-agent
 PIDFILE=/run/$NAME.pid
+OUTPUTFILE=/var/log/oco-agent.log
 DESC="OCO Agent"
 SCRIPTNAME=/etc/init.d/oco-agent
 
@@ -28,7 +29,7 @@ test -x $DAEMON || exit 0
 
 startit() {
         log_daemon_msg "Starting $DESC" "$NAME"
-        start-stop-daemon --start --quiet --oknodo --make-pidfile --pidfile "$PIDFILE" --background --exec $DAEMON -- --daemon --config /etc/oco-agent.ini
+        start-stop-daemon --start --quiet --oknodo --make-pidfile --pidfile "$PIDFILE" --background --output "$OUTPUTFILE" --exec $DAEMON -- --daemon --config /etc/oco-agent.ini
         status=$?
         log_end_msg $status
 }
