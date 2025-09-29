@@ -272,7 +272,12 @@ def writeConfig(section, key, value):
 	if(not configParser.has_section(section)):
 		configParser.add_section(section)
 	configParser.set(section, key, value)
-	with open(configFilePath, 'w') as fileHandle:
+
+	if 'win32' in OS_TYPE:
+		flags = os.O_WRONLY | os.O_CREAT | os.O_DIRECT
+	else:
+		flags = os.O_WRONLY | os.O_CREAT
+	with os.fdopen(os.open(configFilePath, flags), 'w') as fileHandle:
 		configParser.write(fileHandle)
 
 # function for checking if agent is already running (e.g. due to long running software jobs)
