@@ -274,9 +274,9 @@ def writeConfig(section, key, value):
 	configParser.set(section, key, value)
 
 	if 'win32' in OS_TYPE:
-		flags = os.O_WRONLY | os.O_CREAT | os.O_DIRECT
-	else:
 		flags = os.O_WRONLY | os.O_CREAT
+	else:
+		flags = os.O_WRONLY | os.O_CREAT | os.O_SYNC
 	with os.fdopen(os.open(configFilePath, flags), 'w') as fileHandle:
 		configParser.write(fileHandle)
 
