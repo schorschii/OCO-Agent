@@ -52,12 +52,15 @@ OS_TYPE = sys.platform.lower()
 if 'win32' in OS_TYPE:
 	import wmi, ctypes
 	from .windows import inventory, password_rotation
+	from .windows.policy_deployment import PolicyDeployment
 
 elif 'linux' in OS_TYPE:
 	from .linux import inventory, password_rotation
+	from .base_policy_deployment import BasePolicyDeployment as PolicyDeployment
 
 elif 'darwin' in OS_TYPE:
 	from .macos import inventory, password_rotation
+	from .base_policy_deployment import BasePolicyDeployment as PolicyDeployment
 	# set OpenSSL path to macOS defaults
 	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
 	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
@@ -341,7 +344,7 @@ def mainloop(args):
 	i = inventory.Inventory(config)
 
 	# send initial request
-	logger('Sending agent_hello...')
+	logger('Sending oco.agent.hello...')
 	request = jsonRequest('oco.agent.hello', {
 		'agent_version': __version__,
 		'networks': i.getNics(),
@@ -377,7 +380,7 @@ def mainloop(args):
 			if('logins-since' in responseJson['result']['params']):
 				since = responseJson['result']['params']['logins-since']
 			logins = i.getLogins(datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc))
-			jsonRequest('oco.agent.update', {
+			request2 = jsonRequest('oco.agent.update', {
 				'hostname': i.getHostname(),
 				'agent_version': __version__,
 				'os': i.getOs(),
@@ -408,6 +411,12 @@ def mainloop(args):
 				'battery_status': i.getBatteryStatus(),
 				'devices': i.getUsbDevices(),
 			})
+			if(request2 != None and request2.status_code == 200):
+				pd = PolicyDeployment()
+				responseJson2 = request2.json()
+				if('params' in responseJson2['result']
+				and 'policies' in responseJson2['result']['params']):
+					pd.applyPolicies(responseJson2['result']['params']['policies'])
 
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
