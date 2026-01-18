@@ -35,5 +35,22 @@ class BasePolicyDeployment:
 
 		self.manifestationModuleMap[module](scope, path, key, value)
 
-	def applyJsonPolicy(self, scope, file, key, value):
-		print('!!! somebody needs to implement this', file, key, value)
+	def applyJsonPolicy(self, scope, path, key, value):
+		# load existing file if exists
+		values = {}
+		if(os.path.isfile(path)):
+			with open(path, 'r') as file:
+				values = json.load(file)
+
+		# apply new values
+		# append as dict/array if string can be parsed as JSON
+		if(isinstance(value, str)):
+			try:
+				parsed = json.loads(value)
+				value = parsed
+			except json.decoder.JSONDecodeError: pass
+		values[key] = value
+
+		# write updated policies file
+		with open(path, 'w') as file:
+			json.dump(values, file, indent=2)
