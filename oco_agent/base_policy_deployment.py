@@ -14,7 +14,9 @@ class BasePolicyDeployment:
 		self.manifestationModuleMap['JSON'] = self.applyJsonPolicy
 
 	def applyPolicies(self, policyDict):
+		if(not isinstance(policyDict, dict)): return
 		for scope, policies in policyDict.items():
+			if(not isinstance(policies, dict)): continue
 			for definition, value in policies.items():
 				try:
 					logger(f'Processing {scope} policy {definition} => {value}')
