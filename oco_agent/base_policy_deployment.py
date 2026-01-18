@@ -52,5 +52,6 @@ class BasePolicyDeployment:
 		values[key] = value
 
 		# write updated policies file
+		os.makedirs(os.path.dirname(path), exist_ok=True)
 		with open(path, 'w') as file:
 			json.dump(values, file, indent=2)
