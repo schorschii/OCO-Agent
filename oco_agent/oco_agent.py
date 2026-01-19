@@ -80,6 +80,7 @@ elif 'darwin' in OS_TYPE:
 ##### GLOBAL VARIABLES #####
 
 exitEvent = threading.Event()
+forceUpdateFlag = False
 restartFlag = False
 serverTimestamp = 0
 configFilePath = None
@@ -299,6 +300,49 @@ def writeConfig(section, key, value):
 	with os.fdopen(os.open(configFilePath, fileWriteFlags()), 'w') as fileHandle:
 		configParser.write(fileHandle)
 
+def doInventoryUpdate(i, since):
+	logger('Updating inventory data...')
+	logins = []
+	if(since):
+		logins = i.getLogins(datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc))
+	request2 = jsonRequest('oco.agent.update', {
+		'hostname': i.getHostname(),
+		'agent_version': __version__,
+		'os': i.getOs(),
+		'os_version': i.getOsVersion(),
+		'os_license': i.getIsActivated(),
+		'os_language': i.getLocale(),
+		'kernel_version': i.getKernelVersion(),
+		'architecture': i.getArchitecture(),
+		'cpu': i.getCpu(),
+		'ram': i.getRam(),
+		'gpu': i.getGpu(),
+		'serial': i.getMachineSerial(),
+		'manufacturer': i.getMachineManufacturer(),
+		'model': i.getMachineModel(),
+		'bios_version': i.getBiosVersion(),
+		'uptime': i.getUptime(),
+		'boot_type': i.getUefiOrBios(),
+		'secure_boot': i.getSecureBootEnabled(),
+		'domain': i.getDomain(),
+		'networks': i.getNics(),
+		'screens': i.getScreens(),
+		'printers': i.getPrinters(),
+		'partitions': i.getPartitions(),
+		'software': i.getInstalledSoftware(),
+		'logins': logins,
+		'users': i.getLocalUsers(),
+		'battery_level': i.getBatteryLevel(),
+		'battery_status': i.getBatteryStatus(),
+		'devices': i.getUsbDevices(),
+	})
+	if(request2 != None and request2.status_code == 200):
+		pd = PolicyDeployment()
+		responseJson2 = request2.json()
+		if('params' in responseJson2['result']
+		and 'policies' in responseJson2['result']['params']):
+			pd.applyPolicies(responseJson2['result']['params']['policies'])
+
 # function for checking if agent is already running (e.g. due to long running software jobs)
 def lockCheck():
 	try:
@@ -356,11 +400,11 @@ def daemon(args):
 # the main server communication function
 # sends a "agent_hello" packet to the server and then executes various tasks, depending on the server's response
 def mainloop(args):
-	global restartFlag, configParser
+	global restartFlag, configParser, forceUpdateFlag
 	i = inventory.Inventory(config)
 
 	# send initial request
-	logger('Sending oco.agent.hello...')
+	logger('Sending oco.agent.hello...', 'forceUpdateFlag:', forceUpdateFlag)
 	request = jsonRequest('oco.agent.hello', {
 		'agent_version': __version__,
 		'networks': i.getNics(),
@@ -368,7 +412,9 @@ def mainloop(args):
 		'uptime': i.getUptime(),
 		'battery_level': i.getBatteryLevel(),
 		'battery_status': i.getBatteryStatus(),
+		'force_update': forceUpdateFlag
 	})
+	forceUpdateFlag = False
 
 	# check response
 	if(request != None and request.status_code == 200):
@@ -390,49 +436,10 @@ def mainloop(args):
 
 		# send computer info if requested
 		if(responseJson['result']['params']['update'] == 1):
-			logger('Updating inventory data...')
-
 			since = '2000-01-01 00:00:00'
 			if('logins-since' in responseJson['result']['params']):
 				since = responseJson['result']['params']['logins-since']
-			logins = i.getLogins(datetime.datetime.strptime(since, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc))
-			request2 = jsonRequest('oco.agent.update', {
-				'hostname': i.getHostname(),
-				'agent_version': __version__,
-				'os': i.getOs(),
-				'os_version': i.getOsVersion(),
-				'os_license': i.getIsActivated(),
-				'os_language': i.getLocale(),
-				'kernel_version': i.getKernelVersion(),
-				'architecture': i.getArchitecture(),
-				'cpu': i.getCpu(),
-				'ram': i.getRam(),
-				'gpu': i.getGpu(),
-				'serial': i.getMachineSerial(),
-				'manufacturer': i.getMachineManufacturer(),
-				'model': i.getMachineModel(),
-				'bios_version': i.getBiosVersion(),
-				'uptime': i.getUptime(),
-				'boot_type': i.getUefiOrBios(),
-				'secure_boot': i.getSecureBootEnabled(),
-				'domain': i.getDomain(),
-				'networks': i.getNics(),
-				'screens': i.getScreens(),
-				'printers': i.getPrinters(),
-				'partitions': i.getPartitions(),
-				'software': i.getInstalledSoftware(),
-				'logins': logins,
-				'users': i.getLocalUsers(),
-				'battery_level': i.getBatteryLevel(),
-				'battery_status': i.getBatteryStatus(),
-				'devices': i.getUsbDevices(),
-			})
-			if(request2 != None and request2.status_code == 200):
-				pd = PolicyDeployment()
-				responseJson2 = request2.json()
-				if('params' in responseJson2['result']
-				and 'policies' in responseJson2['result']['params']):
-					pd.applyPolicies(responseJson2['result']['params']['policies'])
+			doInventoryUpdate(i, since)
 
 		# execute jobs if requested
 		if(len(responseJson['result']['params']['software-jobs']) > 0):
@@ -635,6 +642,11 @@ def signal_handler(signum, frame):
 	global exitEvent
 	exitEvent.set()
 
+def logon_handler(action, pContext, event):
+	global forceUpdateFlag
+	logger('Got logon event:', event)
+	forceUpdateFlag = True
+
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 def main():
 	global configFilePath, configParser, config, serverTimestamp
@@ -692,6 +704,20 @@ def main():
 					break
 			except Exception as e:
 				logger('DNS auto discovery failed:', e)
+
+		# on Windows, start the logon listener
+		if 'win32' in OS_TYPE:
+			from winevt_ng import EventLog
+			try:
+				logger('Starting logon listener...')
+				# instant policy update after new user logon
+				subscription = EventLog.Subscribe(
+					"Security",
+					"*[(EventData[Data[@Name='LogonType']='2'] or EventData[Data[@Name='LogonType']='10'] or EventData[Data[@Name='LogonType']='11']) and System[(EventID='4624')]]",
+					logon_handler
+				)
+			except Exception as e2:
+				logger('Unable to start logon listener:', e2)
 
 	except Exception as e:
 		logger('main():', type(e).__name__+':', e)
