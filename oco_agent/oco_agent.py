@@ -38,13 +38,20 @@ from dns import resolver, rdatatype
 from Crypto.Cipher import AES
 from Crypto import Random
 
+from . import __version__, logger, guessEncodingAndDecode
+
 ##### CONSTANTS #####
 
-from . import __version__, logger, guessEncodingAndDecode
-EXECUTABLE_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
+OS_TYPE             = sys.platform.lower()
+EXECUTABLE_PATH     = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+'/oco-agent.ini'
-LOCKFILE_PATH = tempfile.gettempdir()+'/oco-agent.lock'
-OS_TYPE = sys.platform.lower()
+DEFAULT_TSTAMP_PATH = EXECUTABLE_PATH+'/oco-agent.timestamp'
+LOCKFILE_PATH       = tempfile.gettempdir()+'/oco-agent.lock'
+
+if 'linux' in OS_TYPE or 'darwin' in OS_TYPE:
+	DEFAULT_TSTAMP_PATH = '/var/lib/oco-agent/oco-agent.timestamp'
+if 'linux' in OS_TYPE:
+	DEFAULT_CONFIG_PATH = '/etc/oco-agent.ini'
 
 
 ##### OS SPECIFIC IMPORTS #####
@@ -74,6 +81,7 @@ elif 'darwin' in OS_TYPE:
 
 exitEvent = threading.Event()
 restartFlag = False
+serverTimestamp = 0
 configFilePath = None
 configParser = configparser.RawConfigParser()
 config = {
@@ -103,7 +111,6 @@ config = {
 	# Server config
 	'api-url': '',
 	'server-key': '',
-	'server-timestamp': None,
 }
 
 
@@ -156,6 +163,8 @@ def downloadFile(url, packageId, path, jobId):
 						})
 
 def jsonRequest(method, data, throw=True):
+	global serverTimestamp
+
 	i = inventory.Inventory(config)
 	data = {
 		'jsonrpc': '2.0',
@@ -189,10 +198,10 @@ def jsonRequest(method, data, throw=True):
 		response_json = response.json()
 		if(not response_json or 'result' not in response_json or 'timestamp' not in response_json['result']):
 			raise Exception('No timestamp in server response')
-		if(config['server-timestamp'] and float(response_json['result']['timestamp']) <= float(config['server-timestamp'])):
+		if(float(response_json['result']['timestamp']) <= serverTimestamp):
 			raise Exception('Server timestamp is the same or lower than last server timestamp - this might be an attack, aborting')
-		writeConfig('server', 'timestamp', float(response_json['result']['timestamp']))
-		config['server-timestamp'] = configParser.get('server', 'timestamp')
+		serverTimestamp = float(response_json['result']['timestamp'])
+		writeTimestamp(serverTimestamp)
 
 		# check server signature if set in agent config
 		if(config['server-key']):
@@ -270,17 +279,24 @@ def encrypt(data, key):
 	iv_64 = base64.b64encode(iv).decode('ascii')
 	return {'iv':iv_64, 'data':encrypted_64}
 
+def fileWriteFlags():
+	if 'win32' in OS_TYPE:
+		return os.O_WRONLY | os.O_CREAT
+	else:
+		return os.O_WRONLY | os.O_CREAT | os.O_SYNC
+
+def writeTimestamp(tstamp):
+	global DEFAULT_TSTAMP_PATH
+	os.makedirs(os.path.dirname(DEFAULT_TSTAMP_PATH), exist_ok=True)
+	with os.fdopen(os.open(DEFAULT_TSTAMP_PATH, fileWriteFlags()), 'w') as fileHandle:
+		fileHandle.write(str(tstamp))
+
 def writeConfig(section, key, value):
 	global configParser, configFilePath
 	if(not configParser.has_section(section)):
 		configParser.add_section(section)
 	configParser.set(section, key, value)
-
-	if 'win32' in OS_TYPE:
-		flags = os.O_WRONLY | os.O_CREAT
-	else:
-		flags = os.O_WRONLY | os.O_CREAT | os.O_SYNC
-	with os.fdopen(os.open(configFilePath, flags), 'w') as fileHandle:
+	with os.fdopen(os.open(configFilePath, fileWriteFlags()), 'w') as fileHandle:
 		configParser.write(fileHandle)
 
 # function for checking if agent is already running (e.g. due to long running software jobs)
@@ -621,7 +637,7 @@ def signal_handler(signum, frame):
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 def main():
-	global configFilePath, configParser, config
+	global configFilePath, configParser, config, serverTimestamp
 
 	try:
 		# read arguments
@@ -631,6 +647,14 @@ def main():
 		args = parser.parse_args()
 		configFilePath = args.config
 		logger('OCO Agent starting with config file: '+configFilePath+' ...')
+
+		# read timestamp
+		if(os.path.isfile(DEFAULT_TSTAMP_PATH)):
+			try:
+				with open(DEFAULT_TSTAMP_PATH, 'r') as f:
+					serverTimestamp = float(f.read())
+			except Exception as e:
+				logger('Unable to load prev timestamp:', e)
 
 		# read config
 		i = inventory.Inventory(config)
@@ -649,7 +673,6 @@ def main():
 		if(configParser.has_section('server')):
 			config['api-url'] = configParser['server'].get('api-url', config['api-url'])
 			config['server-key'] = configParser['server'].get('server-key', config['server-key'])
-			config['server-timestamp'] = configParser['server'].get('timestamp', config['server-timestamp'])
 		if(configParser.has_section('windows')):
 			config['windows']['username-with-domain'] = (int(configParser['windows'].get('username-with-domain', config['windows']['username-with-domain'])) == 1)
 		if(configParser.has_section('linux')):
