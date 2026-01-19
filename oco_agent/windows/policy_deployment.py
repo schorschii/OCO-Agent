@@ -52,11 +52,11 @@ class PolicyDeployment(base_policy_deployment.BasePolicyDeployment):
 		except WindowsError as e: pass
 		return None
 
-	def applyRegistryPolicy(self, scope, path, key, value):
+	def applyRegistryPolicy(self, scope, path, key, value, apply):
 		if(scope == 'machine'):
 			winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_CREATE_SUB_KEY)
-			reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_WRITE)
-			winreg.SetValueEx(reg, key, 0, winreg.REG_DWORD if isinstance(value, int) else winreg.REG_SZ, value)
+			reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_READ|winreg.KEY_WRITE)
+			self.writeRegistryValue(reg, path, key, value, apply)
 
 		else:
 			sid = self.__getSidByGuid(scope)
@@ -72,5 +72,28 @@ class PolicyDeployment(base_policy_deployment.BasePolicyDeployment):
 				self.mountedUserStructs.append(sid)
 
 			winreg.CreateKeyEx(winreg.HKEY_USERS, sid+'\\'+path, 0, winreg.KEY_CREATE_SUB_KEY)
-			reg = winreg.OpenKey(winreg.HKEY_USERS, sid+'\\'+path, 0, winreg.KEY_WRITE)
-			winreg.SetValueEx(reg, key, 0, winreg.REG_DWORD if isinstance(value, int) else winreg.REG_SZ, value)
+			reg = winreg.OpenKey(winreg.HKEY_USERS, sid+'\\'+path, 0, winreg.KEY_READ|winreg.KEY_WRITE)
+			self.writeRegistryValue(reg, path, key, value, apply)
+
+	def writeRegistryValue(self, reg, path, key, value, apply):
+		if(not apply and (isinstance(value, dict) or isinstance(value, list))):
+			pathSplit = path.split('\\')
+			print('\\'.join(pathSplit[:-1]), pathSplit[-1])
+			reg = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, '\\'.join(pathSplit[:-1]), 0, winreg.KEY_ALL_ACCESS)
+			winreg.DeleteKey(reg, pathSplit[-1])
+
+		elif(isinstance(value, dict)):
+			for itemKey, item in value.items():
+				winreg.SetValueEx(reg, itemKey, 0, winreg.REG_DWORD if isinstance(item, int) else winreg.REG_SZ, item)
+
+		elif(isinstance(value, list)):
+			counter = 1
+			for item in value:
+				winreg.SetValueEx(reg, str(counter), 0, winreg.REG_DWORD if isinstance(item, int) else winreg.REG_SZ, item)
+				counter += 1
+
+		else:
+			if(apply):
+				winreg.SetValueEx(reg, key, 0, winreg.REG_DWORD if isinstance(value, int) else winreg.REG_SZ, value)
+			else:
+				winreg.DeleteValue(reg, key)
