@@ -67,7 +67,7 @@ elif 'linux' in OS_TYPE:
 
 elif 'darwin' in OS_TYPE:
 	from .macos import inventory, password_rotation
-	from .base_policy_deployment import BasePolicyDeployment as PolicyDeployment
+	from .macos.policy_deployment import PolicyDeployment
 	# set OpenSSL path to macOS defaults
 	# (Github Runner sets this to /usr/local/etc/openssl@1.1/ which does not exist in plain macOS installations)
 	os.environ['SSL_CERT_FILE'] = '/private/etc/ssl/cert.pem'
