@@ -350,7 +350,7 @@ def lockCheck():
 		with open(LOCKFILE_PATH, 'x') as lockfile:
 			pid = str(os.getpid())
 			lockfile.write(pid)
-			logger('OCO Agent starting with lock file (pid '+pid+')...')
+			logger('Starting with lock file (pid '+pid+')...')
 	except IOError:
 		# there is a lock file - check if pid from lockfile is still active
 		with open(LOCKFILE_PATH, 'r') as lockfile:
@@ -375,7 +375,7 @@ def lockCheck():
 				with open(LOCKFILE_PATH, 'x') as lockfile:
 					pid = str(os.getpid())
 					lockfile.write(pid)
-					logger('OCO Agent starting with lock file (pid '+pid+')...')
+					logger('Starting with lock file (pid '+pid+')...')
 	atexit.register(lockClean, lockfile)
 # clean up lockfile
 def lockClean(lockfile):
@@ -649,16 +649,23 @@ def logon_handler(action, pContext, event):
 
 ##### MAIN ENTRY POINT - AGENT INITIALIZATION #####
 def main():
-	global configFilePath, configParser, config, serverTimestamp
+	global configFilePath, configParser, config, serverTimestamp, forceUpdateFlag
 
 	try:
 		# read arguments
-		parser = argparse.ArgumentParser(add_help=False)
-		parser.add_argument('--config', default=DEFAULT_CONFIG_PATH, type=str)
-		parser.add_argument('--daemon', action='store_true')
+		parser = argparse.ArgumentParser()
+		parser.add_argument('--config', default=DEFAULT_CONFIG_PATH, type=str, help='Path to config file')
+		parser.add_argument('--daemon', action='store_true', help='Run in daemon mode (loop until SIGTERM/SIGINT)')
+		parser.add_argument('--force', action='store_true', help='Force inventory & policy update')
 		args = parser.parse_args()
+
+		# set conf path
 		configFilePath = args.config
-		logger('OCO Agent starting with config file: '+configFilePath+' ...')
+		logger('Starting with config file: '+configFilePath+' ...')
+
+		# set force flag
+		if(args.force):
+			forceUpdateFlag = True
 
 		# read timestamp
 		if(os.path.isfile(DEFAULT_TSTAMP_PATH)):
