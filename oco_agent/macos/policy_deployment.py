@@ -22,6 +22,8 @@ class PolicyDeployment(base_policy_deployment.BasePolicyDeployment):
 				elif(isinstance(value, dict)):
 					value = json.dumps(value, separators=(', ',' = ')).replace('"', '')
 					cmd = subprocess.run(['defaults', 'write', path, key, '-dict', str(value)])
+				elif(isinstance(value, bool)):
+					cmd = subprocess.run(['defaults', 'write', path, key, '-bool', 'TRUE' if value else 'FALSE'])
 				elif(isinstance(value, int)):
 					cmd = subprocess.run(['defaults', 'write', path, key, '-int', str(value)])
 				else:
