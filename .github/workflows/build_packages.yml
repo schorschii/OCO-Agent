@@ -237,6 +237,9 @@ jobs:
       - name: Create venv
         run: python -m venv venv
 
+      - name: Upgrade Python setuptools
+        run: venv/Scripts/pip install setuptools==80.9.0
+
       - name: Install Python packages
         run: venv/Scripts/pip install pyinstaller==5.13.2 .
 
