@@ -18,12 +18,12 @@ The OCO agent needs to be installed on every client which should be managed with
 ## System Requirements
 ### Agent
 - 🐧 official supported Linux systems (`.deb` package provided)
-  - Debian 11, 12
-  - Ubuntu 22.04, 24.04
+  - Debian 12, 13
+  - Ubuntu 24.04, 26.04
   - derived distros like Linux Mint 21, 22 etc. with systemd (sysvinit is not supported by the official `.deb` package)
 - 🐧 other Linux Systems will most likely work as well but may require manual agent and dependency installation
-- 🍏 macOS 11, 12, 13 and 14 (`.pkg` package provided)
-- 🪟 Windows 7, 8(.1), 10 and 11 (`.exe` setup provided)
+- 🍏 macOS 13, 14, 15, 26 (`.pkg` package provided for x86 and arm64)
+- 🪟 Windows 7, 8(.1), 10, 11 (`.exe` setup provided)
   <details>
   <summary>Windows 11 hint</summary>
   
