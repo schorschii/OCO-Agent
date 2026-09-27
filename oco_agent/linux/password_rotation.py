@@ -6,6 +6,10 @@ from crypt import crypt
 
 from .. import base_password_rotation, logger
 
+# maximum time (seconds) to wait for usermod before giving up rather than
+# risking the agent hanging indefinitely mid-rotation
+USERMOD_TIMEOUT = 30
+
 
 class PasswordRotation(base_password_rotation.BasePasswordRotation):
 
@@ -19,7 +23,10 @@ class PasswordRotation(base_password_rotation.BasePasswordRotation):
 
 		# update password in local database
 		cmd = ['usermod', '-p', newPasswordHashed, username]
-		res = subprocess.run(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
+		try:
+			res = subprocess.run(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True, timeout=USERMOD_TIMEOUT)
+		except subprocess.TimeoutExpired:
+			raise Exception(' '.join(cmd)+' did not respond within '+str(USERMOD_TIMEOUT)+'s, aborting')
 		if res.returncode == 0:
 			logger('Changed password of user "'+username+'" locally')
 		else:
