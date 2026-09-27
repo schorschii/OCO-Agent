@@ -46,10 +46,12 @@ OS_TYPE             = sys.platform.lower()
 EXECUTABLE_PATH     = os.path.abspath(os.path.dirname(sys.argv[0]))
 DEFAULT_CONFIG_PATH = EXECUTABLE_PATH+'/oco-agent.ini'
 DEFAULT_TSTAMP_PATH = EXECUTABLE_PATH+'/oco-agent.timestamp'
+DEFAULT_PPASS_PATH  = EXECUTABLE_PATH+'/pending-passwords.json'
 LOCKFILE_PATH       = tempfile.gettempdir()+'/oco-agent.lock'
 
 if 'linux' in OS_TYPE or 'darwin' in OS_TYPE:
 	DEFAULT_TSTAMP_PATH = '/var/lib/oco-agent/oco-agent.timestamp'
+	DEFAULT_PPASS_PATH  = '/var/lib/oco-agent/pending-passwords.json'
 if 'linux' in OS_TYPE:
 	DEFAULT_CONFIG_PATH = '/etc/oco-agent.ini'
 
@@ -286,40 +288,35 @@ def fileWriteFlags():
 	else:
 		return os.O_WRONLY | os.O_CREAT | os.O_SYNC
 
-def pendingPasswordsPath():
-	global DEFAULT_TSTAMP_PATH
-	return os.path.join(os.path.dirname(DEFAULT_TSTAMP_PATH), 'oco-agent.pending-passwords.json')
-
 def writePendingPasswords(entries):
-	path = pendingPasswordsPath()
-	os.makedirs(os.path.dirname(path), exist_ok=True)
-	with os.fdopen(os.open(path, fileWriteFlags(), 0o600), 'w') as fileHandle:
+	global DEFAULT_PPASS_PATH
+	os.makedirs(os.path.dirname(DEFAULT_PPASS_PATH), exist_ok=True)
+	with os.fdopen(os.open(DEFAULT_PPASS_PATH, fileWriteFlags(), 0o600), 'w') as fileHandle:
 		fileHandle.write(json.dumps(entries))
 	try:
-		os.chmod(path, 0o600) # enforce permissions regardless of umask
+		os.chmod(DEFAULT_PPASS_PATH, 0o600)
 	except Exception:
 		pass
 
 def readPendingPasswords():
-	path = pendingPasswordsPath()
-	if not os.path.isfile(path):
+	global DEFAULT_PPASS_PATH
+	if not os.path.isfile(DEFAULT_PPASS_PATH):
 		return []
 	try:
-		with open(path, 'r') as fileHandle:
+		with open(DEFAULT_PPASS_PATH, 'r') as fileHandle:
 			return json.loads(fileHandle.read() or '[]')
 	except Exception as e:
 		logger('Unable to read pending password report file, ignoring it:', e)
 		return []
 
 def clearPendingPasswords():
-	path = pendingPasswordsPath()
-	if os.path.isfile(path):
-		os.remove(path)
+	global DEFAULT_PPASS_PATH
+	if os.path.isfile(DEFAULT_PPASS_PATH):
+		os.remove(DEFAULT_PPASS_PATH)
 
 def flushPendingPasswords():
-	# retry reporting any password that was successfully changed locally in a
-	# previous run but never got confirmed to the server (e.g. agent crashed
-	# or lost network connectivity right after the local change)
+	# retry reporting any password that was successfully changed locally in a previous run but never got confirmed to the server
+	# (e.g. agent crashed or lost network connectivity right after the local change)
 	pending = readPendingPasswords()
 	if not pending:
 		return
@@ -652,10 +649,8 @@ def mainloop(args):
 			if(len(events) > 0):
 				jsonRequest('oco.agent.events', {'events':events}, False)
 
-		# make sure no previously confirmed-but-unreported password is stuck locally
-		# (e.g. agent crashed or lost network connectivity right after a successful
-		# local change, before the server could confirm receipt) - retry it first,
-		# before attempting any new rotation this cycle
+		# make sure no previously confirmed but unreported password is stuck locally
+		# retry first before attempting any new rotation this cycle
 		flushPendingPasswords()
 
 		# update admin password if requested
@@ -667,16 +662,11 @@ def mainloop(args):
 					newPassword = pwr.generatePassword(item['alphabet'], item['length'])
 					oldPassword = item['old_password'] if 'old_password' in item else ''
 
-					# change the password LOCALLY FIRST. Only once we know for sure it was
-					# really applied (updatePassword raises on any failure, including a
-					# failed post-change verification) do we tell the server about it -
-					# this way the server can never end up recording a password that
-					# isn't actually active on this machine.
+					# change the password LOCALLY FIRST - only once we know for sure it was
+					# really applied (updatePassword raises on any failure) we tell the server about it
 					pwr.updatePassword(username, newPassword, oldPassword)
 
 					# persist the new password locally until the server has confirmed
-					# receipt, so a crash right after a successful local change doesn't
-					# lose track of it (flushPendingPasswords() picks it up next run)
 					pending = readPendingPasswords()
 					pending.append({'username': username, 'password': newPassword})
 					writePendingPasswords(pending)
@@ -693,11 +683,7 @@ def mainloop(args):
 						clearPendingPasswords()
 
 				except Exception as e:
-					# local change failed (or the server report failed and stays pending
-					# for the next retry): nothing to revoke, since nothing was ever
-					# recorded on the server before being confirmed locally. The rotation
-					# rule simply stays "due" and will be retried on the next hello cycle,
-					# with the same (still correct) old_password.
+					# local change failed or the server report failed
 					logger('Password rotation error for "'+str(username)+'":', e)
 
 
